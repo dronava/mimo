@@ -47,8 +47,8 @@ std::vector<unsigned int *> tx_data;
 std::vector<unsigned int *> rx_data;
 unsigned int received_sample_counter;
 unsigned int num_data_carriers,
-    	     num_pilot_carriers,
-  	     num_occupied_carriers,
+             num_pilot_carriers,
+             num_occupied_carriers,
              num_null_carriers;
 
 int _callback(unsigned char *  _header,
@@ -63,11 +63,11 @@ int _callback(unsigned char *  _header,
   num_frames_detected++;
 
   if (_header_valid)
-      num_valid_headers_received++;
+    num_valid_headers_received++;
 
   if (_payload_valid) {
-      num_valid_packets_received++;
-      num_valid_bytes_received += _payload_len;
+    num_valid_packets_received++;
+    num_valid_bytes_received += _payload_len;
   }
   return 0;
 }
@@ -107,15 +107,15 @@ void * callback (std::vector<gr_complex *> x, unsigned int occupied_carriers) {
   
 #if DEBUG_PRINT_VERBOSE
   printf("******* callback %4u ********\n",
-	 num_valid_packets_received);
+         num_valid_packets_received);
   for(unsigned int i = 0; i < occupied_carriers; i++) {
     printf("%3u,\t", i);
     for(unsigned stream = 0; stream < NUM_STREAMS; stream++) {
       printf("%3.6f + %3.6fi,\t\t",
-	     //	     real(rx_sig[stream][occupied_carriers + i]),
-	     //	     imag(rx_sig[stream][occupied_carriers + i]));
-	     real(x[stream][i]),
-	     imag(x[stream][i]));
+             //      real(rx_sig[stream][occupied_carriers + i]),
+             //      imag(rx_sig[stream][occupied_carriers + i]));
+             real(x[stream][i]),
+             imag(x[stream][i]));
     }
     printf("\n");
   }
@@ -274,7 +274,7 @@ void init_usrp(uhd::usrp::multi_usrp::sptr u,
     }
     else {
       std::cout << "TX Motherboard not compatible\n"
-                << "Subdevice specification for "
+		<< "Subdevice specification for "
                 << u->get_mboard_name()
                 << " not known. Exiting\n";
       exit(1);
@@ -447,7 +447,7 @@ void * rx_worker (void * _data)
     if(sync_state == STATE_WAIT) {
       // stop rx streaming
       stream_cmd.stream_mode = 
-	uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
+        uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
       rx_stream->issue_stream_cmd(stream_cmd);
       // compute channel
       (data->fs)->estimate_channel();
@@ -455,10 +455,10 @@ void * rx_worker (void * _data)
       design_mimo_precoder();
       // start streaming
       stream_cmd.stream_mode = 
-	uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
+        uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
       stream_cmd.stream_now = false;
       stream_cmd.time_spec = (*(data->rx))->get_time_now() 
-	                   + uhd::time_spec_t(0.01);
+                           + uhd::time_spec_t(0.01);
       rx_stream->issue_stream_cmd(stream_cmd);
       // lock mutex and signal tx to start zf
       std::cout << "Rx signalling tx to start zf\n";
@@ -875,10 +875,10 @@ void * rx_worker (void * _data)
     assert(freopen(NULL, "rb", fp[chan]));
     assert(fseek(fp[chan], 0, SEEK_SET) == 0);
     assert(num_accumulated_samples == 
-	   fread(rx_buffer[chan],
-		 sizeof(gr_complex),
-		 num_accumulated_samples,
-		 fp[chan]));
+           fread(rx_buffer[chan],
+                 sizeof(gr_complex),
+                 num_accumulated_samples,
+                 fp[chan]));
   }
   // process the received samples through framesync.
   // use computed CSI to invert the channel at the RX.
@@ -1041,8 +1041,8 @@ void * tx_worker (void * _data)
       pid++) {
     for(unsigned int chan = 0; chan < num_channels; chan++) {
       memmove(fg_in_buffer[chan],
-	      tx_sig[chan] + num_symbols_transmitted,
-	      sizeof(gr_complex)*num_occupied_carriers);
+              tx_sig[chan] + num_symbols_transmitted,
+              sizeof(gr_complex)*num_occupied_carriers);
     }
     num_symbols_transmitted += num_occupied_carriers;
     num_samples_read = 
@@ -1154,8 +1154,8 @@ int UHD_SAFE_MAIN(int argc, char **argv)
   p = (unsigned char *) malloc (sizeof(unsigned char)*M);
   ofdmframe_init_default_sctype(p, M);
   ofdmframe_validate_sctype(p, M, &num_null_carriers,
-			    &num_pilot_carriers,
-			    &num_data_carriers);
+                            &num_pilot_carriers,
+                            &num_data_carriers);
   num_occupied_carriers = num_pilot_carriers + num_data_carriers;
   tx_sig_len = num_occupied_carriers*PID_MAX;
   for(unsigned int chan = 0; chan < num_streams; chan++) {
@@ -1163,20 +1163,20 @@ int UHD_SAFE_MAIN(int argc, char **argv)
     mod.push_back(modem_create(MODEM_SCHEME));
     dem.push_back(modem_create(MODEM_SCHEME));
     tx_sig.push_back((gr_complex *) malloc 
-		     (sizeof(gr_complex)*tx_sig_len));
+                     (sizeof(gr_complex)*tx_sig_len));
     rx_sig.push_back((gr_complex *) malloc 
-		     (sizeof(gr_complex)*PID_MAX*(M + cp_len)));
+                     (sizeof(gr_complex)*PID_MAX*(M + cp_len)));
     tx_data.push_back((unsigned int *) malloc 
-		      (sizeof(unsigned int)*tx_sig_len));
+                      (sizeof(unsigned int)*tx_sig_len));
     rx_data.push_back((unsigned int *) malloc 
-		      (sizeof(unsigned int)*tx_sig_len));
+                      (sizeof(unsigned int)*tx_sig_len));
     std::fill(tx_data[chan], tx_data[chan] + tx_sig_len, 0);
     std::fill(tx_sig[chan], tx_sig[chan] + tx_sig_len, gr_complex(0.0, 0.0));
 #if SISO
     if(chan == SISO_TX) {
       for(unsigned int sample = 0; sample < tx_sig_len; sample++) {
-	tx_data[chan][sample] = rand() % ARITY;
-	modem_modulate(mod[chan], tx_data[chan][sample], tx_sig[chan] + sample);
+        tx_data[chan][sample] = rand() % ARITY;
+        modem_modulate(mod[chan], tx_data[chan][sample], tx_sig[chan] + sample);
       }
     }
 #else
@@ -1201,9 +1201,9 @@ int UHD_SAFE_MAIN(int argc, char **argv)
         boost::format("%srx_sig%d.dat") % LOG_DIR % (chan + 1)).c_str(),
         "wb"));
       fwrite(tx_data[chan], sizeof(unsigned int), tx_sig_len,
-	     tx_data_fp[chan]);
+             tx_data_fp[chan]);
       fwrite(tx_sig[chan], sizeof(gr_complex), tx_sig_len,
-	     tx_sig_fp[chan]);
+             tx_sig_fp[chan]);
       fclose(tx_data_fp[chan]);
       fclose(tx_sig_fp[chan]);
   }
@@ -1348,7 +1348,7 @@ int UHD_SAFE_MAIN(int argc, char **argv)
     for(unsigned int sample = 0; sample < tx_sig_len; sample++) {
       modem_demodulate(dem[chan], rx_sig[chan][sample], rx_data[chan] + sample);
       if(rx_data[chan][sample] == tx_data[chan][sample]) {
-	num_valid_bytes[chan]++;
+        num_valid_bytes[chan]++;
       }
     }
   }
@@ -1356,9 +1356,9 @@ int UHD_SAFE_MAIN(int argc, char **argv)
   for(unsigned int chan = 0; chan < num_streams; chan++) {
 #if LOG
     fwrite(rx_data[chan], sizeof(unsigned int), tx_sig_len,
-  	     rx_data_fp[chan]);
+             rx_data_fp[chan]);
     fwrite(rx_sig[chan], sizeof(gr_complex), tx_sig_len,
-  	     rx_sig_fp[chan]);
+             rx_sig_fp[chan]);
     fclose(rx_data_fp[chan]);
     fclose(rx_sig_fp[chan]);
 #endif
@@ -1394,12 +1394,12 @@ int UHD_SAFE_MAIN(int argc, char **argv)
 #if SISO
   printf("    valid symbols received  : %6u\n", num_valid_bytes_received);
   printf("    symbol error rate       : %1.6f%%\n",
-	 (float(tx_sig_len - num_valid_bytes_received)/float(tx_sig_len))*100);
+         (float(tx_sig_len - num_valid_bytes_received)/float(tx_sig_len))*100);
 #else
   for(unsigned int chan = 0; chan < num_streams; chan++) {
     printf("    valid symbols received %u: %6u\n", chan, num_valid_bytes[chan]);
     printf("    symbol error rate      %u: %1.6f%%\n", chan,
-	   (float(tx_sig_len - num_valid_bytes[chan])/float(tx_sig_len))*100);
+           (float(tx_sig_len - num_valid_bytes[chan])/float(tx_sig_len))*100);
   }
 #endif
   printf("    tx run time             : %6lu\n", tx_end - tx_begin);

@@ -133,8 +133,8 @@ namespace rx_beamforming {
       assert(volk_is_aligned(X[i]));
       assert(volk_is_aligned(x[i]));
       ifft[i] = fftwf_plan_dft_1d(M,
-  				reinterpret_cast<fftwf_complex *>(X[i]),
-  				reinterpret_cast<fftwf_complex *>(x[i]),
+                                reinterpret_cast<fftwf_complex *>(X[i]),
+                                reinterpret_cast<fftwf_complex *>(x[i]),
                                   FFTW_BACKWARD,
                                   FFTW_ESTIMATE);
       // initialize S1 sequence
@@ -209,27 +209,27 @@ namespace rx_beamforming {
   
   unsigned int
   framegen::assemble_mimo_packet(std::vector<gr_complex *> tx_buff,
-				 std::vector<gr_complex *> in_buff)
+                                 std::vector<gr_complex *> in_buff)
   {
     assert(tx_buff.size() == num_streams);
     assert(in_buff.size() == num_streams);
     for(unsigned int stream = 0; stream < num_streams; stream++) {
       for(unsigned int i = 0, j = 0; i < M; i++) {
-	if(p[i] == OFDMFRAME_SCTYPE_NULL)
-	  X[stream][i] = 0.0f;
-	else
-	  X[stream][i] = in_buff[stream][j++];
+        if(p[i] == OFDMFRAME_SCTYPE_NULL)
+          X[stream][i] = 0.0f;
+        else
+          X[stream][i] = in_buff[stream][j++];
       }
       fftwf_execute(ifft[stream]);
       volk_32fc_s32fc_multiply_32fc(volk_buff_fc1, x[stream], g_data, M);
       // cyclic prefix
       memmove(tx_buff[stream],
-	      volk_buff_fc1 + M - cp_len,
-	      sizeof(gr_complex)*cp_len);
+              volk_buff_fc1 + M - cp_len,
+              sizeof(gr_complex)*cp_len);
       // ofdm symbol
       memmove(tx_buff[stream] + cp_len,
-	      volk_buff_fc1,
-	      sizeof(gr_complex)*M);
+              volk_buff_fc1,
+              sizeof(gr_complex)*M);
     }
     return symbol_len;
   }
@@ -272,7 +272,7 @@ namespace rx_beamforming {
                        unsigned char * const &_p,
                        msequence const &_ms_S0,
                        std::vector<msequence> const &_ms_S1,
-  		       mimo_callback _callback) 
+                       mimo_callback _callback) 
   {
     // assign values for variables
     M = _M;
@@ -302,18 +302,18 @@ namespace rx_beamforming {
       G[sc].resize(num_streams);
       W[sc].resize(num_streams);
       for(unsigned int rx_stream = 0; rx_stream < num_streams; rx_stream++) {
-	G[sc][rx_stream].resize(num_streams);
-	W[sc][rx_stream].resize(num_streams);
-	for(unsigned int tx_stream = 0; tx_stream < num_streams; tx_stream++) {
-	  if((p[sc] != OFDMFRAME_SCTYPE_NULL) && (tx_stream == rx_stream)) {
-	    G[sc][rx_stream][tx_stream] = 1.0;
-	    W[sc][rx_stream][tx_stream] = 1.0;
-	  }
-	  else {
-	    G[sc][rx_stream][tx_stream] = 0.0;
-	    W[sc][rx_stream][tx_stream] = 0.0;
-	  }
-	}
+        G[sc][rx_stream].resize(num_streams);
+        W[sc][rx_stream].resize(num_streams);
+        for(unsigned int tx_stream = 0; tx_stream < num_streams; tx_stream++) {
+          if((p[sc] != OFDMFRAME_SCTYPE_NULL) && (tx_stream == rx_stream)) {
+            G[sc][rx_stream][tx_stream] = 1.0;
+            W[sc][rx_stream][tx_stream] = 1.0;
+          }
+          else {
+            G[sc][rx_stream][tx_stream] = 0.0;
+            W[sc][rx_stream][tx_stream] = 0.0;
+          }
+        }
       }
     }
 
@@ -361,7 +361,7 @@ namespace rx_beamforming {
               (sizeof(gr_complex)*
                M*num_access_codes);
       symbol[i] = (gr_complex *) malloc 
-	          (sizeof(gr_complex)*symbol_len);
+                  (sizeof(gr_complex)*symbol_len);
       X[i] = (std::complex<float> *) fftwf_malloc
              (sizeof(std::complex<float>)*M);
       x[i] = (std::complex<float> *) fftwf_malloc
@@ -369,8 +369,8 @@ namespace rx_beamforming {
       assert(volk_is_aligned(X[i]));
       assert(volk_is_aligned(x[i]));
       fft[i] = fftwf_plan_dft_1d(M,
-  			       reinterpret_cast<fftwf_complex *>(x[i]),
-  			       reinterpret_cast<fftwf_complex *>(X[i]),
+                               reinterpret_cast<fftwf_complex *>(x[i]),
+                               reinterpret_cast<fftwf_complex *>(X[i]),
                                  FFTW_FORWARD,
                                  FFTW_ESTIMATE);
       // initialize S1 sequence
@@ -388,19 +388,19 @@ namespace rx_beamforming {
       plateau_start[i] = 0;
       plateau_end[i] = 0;
       access_code_buffer[i] = windowcf_create(access_code_buffer_len +
-					      tx_sig_len);
+                                              tx_sig_len);
 
 #if DEBUG_LOG
       f_sc_debug_out.push_back(fopen(boost::str(boost::format("%s%d.dat")
-						% F_SC_DEBUG_OUT_PREFIX
-						% (i + 1)).c_str(),
-				"wb"));
+                                                % F_SC_DEBUG_OUT_PREFIX
+                                                % (i + 1)).c_str(),
+                                "wb"));
       if(!(f_sc_debug_out[i])) {
-	printf("***** error opening file %s\n",
-	       boost::str(boost::format("%s%d.dat") 
-			  % F_SC_DEBUG_OUT_PREFIX
-			  % (i + 1)).c_str());
-	exit(1);
+        printf("***** error opening file %s\n",
+               boost::str(boost::format("%s%d.dat") 
+                          % F_SC_DEBUG_OUT_PREFIX
+                          % (i + 1)).c_str());
+        exit(1);
       }
 #endif
     }
@@ -477,13 +477,13 @@ namespace rx_beamforming {
       // FIXME correct frequency offset
       switch(state) {
         case STATE_SEEK_PLATEAU:
-	  execute_sc_sync(_x);
-	  break;
+          execute_sc_sync(_x);
+          break;
         case STATE_SAVE_ACCESS_CODES:
-	  execute_save_access_codes(_x);
-	  break;
+          execute_save_access_codes(_x);
+          break;
         case STATE_MIMO:
-	  break_loop = true;
+          break_loop = true;
           break;
         default:
           printf("framesync: state %d not handled, exiting\n", state);
@@ -491,7 +491,7 @@ namespace rx_beamforming {
       }
       num_samples_processed++;
       if(break_loop)
-	break;
+        break;
     }
     return state;
   }
@@ -510,8 +510,8 @@ namespace rx_beamforming {
     unsigned int j = 0;
     for(unsigned int sc = 0; sc < M; sc++) {
       if(p[sc] != OFDMFRAME_SCTYPE_NULL) {
-	x[siso_rx][j] = X[siso_rx][sc]*conj(G[sc][siso_rx][siso_tx]);
-	j++;
+        x[siso_rx][j] = X[siso_rx][sc]*conj(G[sc][siso_rx][siso_tx]);
+        j++;
       }
     }
     callback(x, M_occupied);
@@ -532,9 +532,9 @@ namespace rx_beamforming {
     for(unsigned int i = 0; i < symbol_len; i++) {
       printf("%3u,\t", i);
       for(unsigned int stream = 0; stream < num_streams; stream++) {
-	printf("%3.6f + %3.6fi,\t\t",
-	       real(symbol[stream][i]),
-	       imag(symbol[stream][i]));
+        printf("%3.6f + %3.6fi,\t\t",
+               real(symbol[stream][i]),
+               imag(symbol[stream][i]));
       }
       printf("\n");
     }
@@ -542,7 +542,7 @@ namespace rx_beamforming {
 
     for(unsigned int rx_stream = 0; rx_stream < num_streams; rx_stream++) {
       memmove(x[rx_stream], symbol[rx_stream] + cp_len,
-	      sizeof(gr_complex)*M);
+              sizeof(gr_complex)*M);
       fftwf_execute(fft[rx_stream]);
     }
     // FIXME works only for 2 x 2.
@@ -550,11 +550,11 @@ namespace rx_beamforming {
     unsigned int j = 0;
     for(unsigned int sc = 0; sc < M; sc++) {
       if(p[sc] != OFDMFRAME_SCTYPE_NULL) {
-	x[0][j] = W[sc][0][0]*X[0][sc] +
-	          W[sc][0][1]*X[1][sc];
-	x[1][j] = W[sc][1][0]*X[0][sc] +
-    	          W[sc][1][1]*X[1][sc];
-	j++;     
+        x[0][j] = W[sc][0][0]*X[0][sc] +
+                  W[sc][0][1]*X[1][sc];
+        x[1][j] = W[sc][1][0]*X[0][sc] +
+                  W[sc][1][1]*X[1][sc];
+        j++;     
       }
     }
     callback(x, M_occupied);
@@ -573,23 +573,23 @@ namespace rx_beamforming {
 #endif
       if(y[stream] > PLATEAU_THREASHOLD)
       {
-	if(in_plateau[stream])
-	  plateau_end[stream] = num_samples_processed;
-	else {
-	  in_plateau[stream] = true;
-	  plateau_start[stream] = num_samples_processed;
-	  plateau_end[stream] = num_samples_processed;
-	}
+        if(in_plateau[stream])
+          plateau_end[stream] = num_samples_processed;
+        else {
+          in_plateau[stream] = true;
+          plateau_start[stream] = num_samples_processed;
+          plateau_end[stream] = num_samples_processed;
+        }
       }
       else
-	in_plateau[stream] = false;
+        in_plateau[stream] = false;
       proceed = proceed &&
-	        (plateau_end[stream] - plateau_start[stream] > cp_len) &&
-	        (in_plateau[stream]);
+                (plateau_end[stream] - plateau_start[stream] > cp_len) &&
+                (in_plateau[stream]);
     }
     if(proceed) {
       for(unsigned int stream = 0; stream < num_streams; stream++)
-	sync_index += plateau_start[stream];
+        sync_index += plateau_start[stream];
       sync_index /= num_streams;
       printf("***** proceed to save access codes ***** \n");
       state = STATE_SAVE_ACCESS_CODES;
@@ -614,7 +614,7 @@ namespace rx_beamforming {
     if(num_samples_processed - sync_index < 
        tx_sig_len + access_code_buffer_len - symbol_len) {
       for(unsigned int chan = 0; chan < num_streams; chan++) {
-	windowcf_push(access_code_buffer[chan], _x[chan]);
+        windowcf_push(access_code_buffer[chan], _x[chan]);
       }
       return;
     }
@@ -638,17 +638,17 @@ namespace rx_beamforming {
     FILE * corr_file_s0[num_streams];
     for(unsigned int chan = 0; chan < num_streams; chan++) {
       for(unsigned int ac_id = 0; ac_id < max_ac_id; ac_id++) {
-	max_corr[chan][ac_id] = 0.0f;
-	corr_indices[chan][ac_id] = 0;
-	corr_values[chan][ac_id] = (float *) malloc 
-	                           (sizeof(float)*(access_code_buffer_len - M));
+        max_corr[chan][ac_id] = 0.0f;
+        corr_indices[chan][ac_id] = 0;
+        corr_values[chan][ac_id] = (float *) malloc 
+                                   (sizeof(float)*(access_code_buffer_len - M));
 #if DEBUG_LOG
-	corr_files[chan][ac_id] = fopen(boost::str(boost::format("%s%d_%d.dat")
-						   % CORR_FILE_PREFIX
-						   % (chan + 1)
-						   % (ac_id + 1)).c_str(),
-					"wb");
-	assert(corr_files[chan][ac_id]);
+        corr_files[chan][ac_id] = fopen(boost::str(boost::format("%s%d_%d.dat")
+                                                   % CORR_FILE_PREFIX
+                                                   % (chan + 1)
+                                                   % (ac_id + 1)).c_str(),
+                                        "wb");
+        assert(corr_files[chan][ac_id]);
 #endif
       }
       s0_corr[chan] = (float *) malloc (sizeof(float)*(access_code_buffer_len - M));
@@ -656,9 +656,9 @@ namespace rx_beamforming {
       s0_corr_index[chan] = 0;
 #if DEBUG_LOG
       corr_file_s0[chan] = fopen(boost::str(boost::format("%s%d_0.dat")
-					    % CORR_FILE_PREFIX
-					    % (chan + 1)).c_str(),
-				 "wb");
+                                            % CORR_FILE_PREFIX
+                                            % (chan + 1)).c_str(),
+                                 "wb");
       assert(corr_file_s0[chan]);
 #endif
     }
@@ -669,43 +669,43 @@ namespace rx_beamforming {
     // compute the access code indices
     for(unsigned int sample = 0; sample < access_code_buffer_len - M; sample++) {
       for(unsigned int chan = 0; chan < num_streams; chan++) {
-	memmove(x[chan], buffer_ptr[chan] + sample, sizeof(gr_complex)*M);
-	fftwf_execute(fft[chan]);
-	// correlate with S0
+        memmove(x[chan], buffer_ptr[chan] + sample, sizeof(gr_complex)*M);
+        fftwf_execute(fft[chan]);
+        // correlate with S0
         volk_32fc_x2_conjugate_dot_prod_32fc(&xyz,
-					     X[chan],
-					     S0,
-					     M);
+                                             X[chan],
+                                             S0,
+                                             M);
         s0_corr[chan][sample] = real(xyz)*real(xyz) + imag(xyz)*imag(xyz);
         if(s0_corr[chan][sample] > max_s0_corr[chan]) {
           max_s0_corr[chan] = s0_corr[chan][sample];
           s0_corr_index[chan] = sample;
         }
-	// correlate with access codes
-	for(unsigned int code = 0; code < num_access_codes; code++) {
-	  for(unsigned int tx_chan = 0; tx_chan < num_streams; tx_chan++) {
-	    _ac_id = code*num_streams + tx_chan;
-	    volk_32fc_x2_conjugate_dot_prod_32fc(&xyz,
-						 X[chan],
-						 (S1[tx_chan] + code*M),
-						 M);
-	    corr_values[chan][_ac_id][sample] = real(xyz)*real(xyz) + imag(xyz)*imag(xyz);
-	    if(corr_values[chan][_ac_id][sample] > max_corr[chan][_ac_id]) {
-	      corr_indices[chan][_ac_id] = sample;
-	      max_corr[chan][_ac_id] = corr_values[chan][_ac_id][sample];
-	    }
-	  }
-	}
+        // correlate with access codes
+        for(unsigned int code = 0; code < num_access_codes; code++) {
+          for(unsigned int tx_chan = 0; tx_chan < num_streams; tx_chan++) {
+            _ac_id = code*num_streams + tx_chan;
+            volk_32fc_x2_conjugate_dot_prod_32fc(&xyz,
+                                                 X[chan],
+                                                 (S1[tx_chan] + code*M),
+                                                 M);
+            corr_values[chan][_ac_id][sample] = real(xyz)*real(xyz) + imag(xyz)*imag(xyz);
+            if(corr_values[chan][_ac_id][sample] > max_corr[chan][_ac_id]) {
+              corr_indices[chan][_ac_id] = sample;
+              max_corr[chan][_ac_id] = corr_values[chan][_ac_id][sample];
+            }
+          }
+        }
       }
     }
 #if DEBUG_PRINT
     for(unsigned int chan = 0; chan < num_streams; chan++) {
       printf("******** s0_corr_index[%d]    : %6u\n", chan, s0_corr_index[chan]);
       for(unsigned int ac_id = 0; ac_id < max_ac_id; ac_id++) {
-	//      printf("******** s0_corr_index[%d]    : %6u\n", chan, s0_corr_index[chan]);
+        //      printf("******** s0_corr_index[%d]    : %6u\n", chan, s0_corr_index[chan]);
       printf("********* corr_indices[%d][%d] : %6u\n", chan,
-	     ac_id,
-	     corr_indices[chan][ac_id]);
+             ac_id,
+             corr_indices[chan][ac_id]);
       }
     }
 #endif
@@ -716,43 +716,43 @@ namespace rx_beamforming {
     // if this is always true in practice.
     for(unsigned int code = 0; code < num_access_codes; code++) {
       for(unsigned int rx_stream = 0; rx_stream < num_streams; rx_stream++) {
-	for(unsigned int tx_stream = 0; tx_stream < num_streams; tx_stream++) {
-	  _ac_id = code*num_streams + tx_stream;
-	  printf("code: %u, estimating channel between rx: %u, tx: %u, ac_id: %u\n",
-		 code,
-		 rx_stream,
-		 tx_stream,
-		 _ac_id);
-	  memmove(x[rx_stream],
-		  buffer_ptr[rx_stream] + corr_indices[rx_stream][_ac_id],
-		  sizeof(gr_complex)*M);
-	  fftwf_execute(fft[rx_stream]);
-	  for(unsigned int i = 0; i < M; i++) {
-	    if(p[i] != OFDMFRAME_SCTYPE_NULL)
-	      G[i][rx_stream][tx_stream] += X[rx_stream][i]/S1[tx_stream][code*M + i];
-	  }
-	}
+        for(unsigned int tx_stream = 0; tx_stream < num_streams; tx_stream++) {
+          _ac_id = code*num_streams + tx_stream;
+          printf("code: %u, estimating channel between rx: %u, tx: %u, ac_id: %u\n",
+                 code,
+                 rx_stream,
+                 tx_stream,
+                 _ac_id);
+          memmove(x[rx_stream],
+                  buffer_ptr[rx_stream] + corr_indices[rx_stream][_ac_id],
+                  sizeof(gr_complex)*M);
+          fftwf_execute(fft[rx_stream]);
+          for(unsigned int i = 0; i < M; i++) {
+            if(p[i] != OFDMFRAME_SCTYPE_NULL)
+              G[i][rx_stream][tx_stream] += X[rx_stream][i]/S1[tx_stream][code*M + i];
+          }
+        }
       }
     }
     
     // computing receive beamformer
     for(unsigned int i = 0; i < M; i++) {
       if(p[i] != OFDMFRAME_SCTYPE_NULL) 
-	invert(W[i], G[i]);
+        invert(W[i], G[i]);
     }
 
 #if DEBUG_PRINT
     for(unsigned int rx_stream = 0; rx_stream < num_streams; rx_stream++) {
       for(unsigned int tx_stream = 0; tx_stream < num_streams; tx_stream++) {
-	printf("channel states between RX-%u and TX-%u\n",
-	       rx_stream, tx_stream);
-	for(unsigned int i = 0; i < M; i++) {
-	  printf("%2.4f + %2.4fi \t\t %4.6f + %4.6f\n",
-		 real(G[i][rx_stream][tx_stream]),
-		 imag(G[i][rx_stream][tx_stream]),
-		 real(W[i][rx_stream][tx_stream]),
-		 imag(W[i][rx_stream][tx_stream]));
-	}
+        printf("channel states between RX-%u and TX-%u\n",
+               rx_stream, tx_stream);
+        for(unsigned int i = 0; i < M; i++) {
+          printf("%2.4f + %2.4fi \t\t %4.6f + %4.6f\n",
+                 real(G[i][rx_stream][tx_stream]),
+                 imag(G[i][rx_stream][tx_stream]),
+                 real(W[i][rx_stream][tx_stream]),
+                 imag(W[i][rx_stream][tx_stream]));
+        }
       }
     }
 #endif
@@ -762,10 +762,10 @@ namespace rx_beamforming {
     gr_complex _x[num_streams];
     sample_counter = 0;
     for(unsigned int i = corr_indices[1][max_ac_id - 1] + M;
-	i < access_code_buffer_len + tx_sig_len;
-	i++) {
+        i < access_code_buffer_len + tx_sig_len;
+        i++) {
       for(unsigned int stream = 0; stream < num_streams; stream++) {
-	_x[stream] = buffer_ptr[stream][i];
+        _x[stream] = buffer_ptr[stream][i];
       }
 #if SISO
       execute_siso_decode(_x);
@@ -778,11 +778,11 @@ namespace rx_beamforming {
     for(unsigned int chan = 0; chan < num_streams; chan++) {
       for(unsigned int ac_id = 0; ac_id < max_ac_id; ac_id++) {
 #if DEBUG_LOG
-	fwrite(corr_values[chan][ac_id], sizeof(float), access_code_buffer_len - M,
-	       corr_files[chan][ac_id]);
-	fclose(corr_files[chan][ac_id]);
+        fwrite(corr_values[chan][ac_id], sizeof(float), access_code_buffer_len - M,
+               corr_files[chan][ac_id]);
+        fclose(corr_files[chan][ac_id]);
 #endif
-	free(corr_values[chan][ac_id]);
+        free(corr_values[chan][ac_id]);
       }
 #if DEBUG_LOG
       fwrite(s0_corr[chan], sizeof(float), access_code_buffer_len - M, corr_file_s0[chan]);
@@ -1023,13 +1023,13 @@ void ofdmframe_init_S1(const unsigned char * _p,
         // generate symbol
         // s = msequence_generate_symbol(ms,1);
         s = msequence_generate_symbol(ms,2) & 0x11;
-	assert(s < 4);
+        assert(s < 4);
 
         if (_p[i] == OFDMFRAME_SCTYPE_NULL) {
             // NULL subcarrier
             (_S1 + _M*j)[i] = 0.0f;
         } else {
-	  (_S1 + _M*j)[i] = QPSK_CONSTELLATION[s];
+          (_S1 + _M*j)[i] = QPSK_CONSTELLATION[s];
           M_S1++;
         }
       }
@@ -1061,13 +1061,13 @@ void ofdmframe_init_S1(const unsigned char * _p,
         // generate symbol
         // s = msequence_generate_symbol(ms,1);
         s = msequence_generate_symbol(ms,3) & 0x01;
-	assert(s < 2);
+        assert(s < 2);
 
         if (_p[i] == OFDMFRAME_SCTYPE_NULL) {
             // NULL subcarrier
             (_S1 + _M*j)[i] = 0.0f;
         } else {
-	  (_S1 + _M*j)[i] = BPSK_CONSTELLATION[s];
+          (_S1 + _M*j)[i] = BPSK_CONSTELLATION[s];
           M_S1++;
         }
       }
@@ -1083,7 +1083,7 @@ void ofdmframe_init_S1(const unsigned char * _p,
 #endif
 
 void invert(std::vector<std::vector<gr_complex> >  &W,
-	    std::vector<std::vector<gr_complex> > const &G) {
+            std::vector<std::vector<gr_complex> > const &G) {
   assert(G.size() == 2);
   assert(W.size() == 2);
   for(unsigned int rx_stream = 0; rx_stream < 2; rx_stream++) {

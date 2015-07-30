@@ -28,7 +28,7 @@
 
 // callback
 typedef void * (* mimo_callback) (std::vector<gr_complex *>,
-				  unsigned int occupied_carriers);
+                                  unsigned int occupied_carriers);
 
   // receiver state
 typedef enum {
@@ -97,7 +97,7 @@ namespace rx_beamforming {
     write_sync_words(std::vector<std::complex<float> *> tx_buff);
     unsigned int
       assemble_mimo_packet(std::vector<gr_complex *> tx_buff,
-			   std::vector<gr_complex *> in_buff);
+                           std::vector<gr_complex *> in_buff);
     unsigned int get_num_streams();
   };
   
@@ -189,7 +189,7 @@ namespace rx_beamforming {
               unsigned char * const &_p,
               msequence const &_ms_S0,
               std::vector<msequence> const &_ms_S1,
-	      mimo_callback _callback);
+              mimo_callback _callback);
     // destructor
     ~framesync();
     void print();
@@ -197,7 +197,7 @@ namespace rx_beamforming {
     std::vector<std::vector<std::vector<gr_complex> > > get_G();
     unsigned long long int get_num_samples_processed();
     framesync_states_t execute(std::vector<gr_complex *> const &in_buff,
-  			     unsigned int num_samples);
+                             unsigned int num_samples);
     unsigned long int get_plateau_start(unsigned int stream);
     unsigned long int get_plateau_end(unsigned int stream);
     void reset();
@@ -273,6 +273,6 @@ gr_complex conjf(gr_complex z);
 
 // currently only for 2 X 2 matrix
 void invert(std::vector<std::vector<gr_complex> > &W,
-	    std::vector<std::vector<gr_complex> > const &G);
+            std::vector<std::vector<gr_complex> > const &G);
 
 #endif // FRAMING_H
