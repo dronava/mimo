@@ -54,7 +54,7 @@ extern gr_complex QPSK_CONSTELLATION[];
 // RF front end configurations
 #define CENTER_FREQUENCY        5100e6
 #define SAMPLING_RATE           1e6
-#define TX_FRONTEND_GAIN        45.0
+#define TX_FRONTEND_GAIN        60.0
 #define RX_FRONTEND_GAIN        45.0
 
 #define CLOCK_SOURCE            CLOCK_SOURCE_EXTERNAL
@@ -64,11 +64,6 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define NUM_SUBCARRIERS         64
 #define CP_LENGTH               16
 #define BASEBAND_GAIN           0.25
-#define NUM_ACCESS_CODES        5
-#define NUM_STREAMS	        2
-
-#define MODEM_SCHEME            LIQUID_MODEM_DPSK2
-#define ARITY                   2
 
 // generator polynomials obtained from
 // primitive_polys.pdf
@@ -104,6 +99,11 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define CONSTELLATION           BPSK_CONSTELLATION
 #define CONSTELLATION_SIZE      BPSK_CONSTELLATION_SIZE
 #define MAKE_S1_QPSK            false
-#define INVERT_CHANNEL          false
+#define INVERT_CHANNEL          true
+#define NUM_ACCESS_CODES        5
+#define NUM_MIMO_ACCESS_CODES   3
+#define NUM_STREAMS	        2
+#define MODEM_SCHEME            LIQUID_MODEM_DPSK4
+#define ARITY                   4
 
 #endif
