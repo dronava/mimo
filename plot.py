@@ -6,7 +6,7 @@ from cmath import phase, sqrt
 from math import pi
 from optparse import OptionParser
 
-num_access_codes = 3
+num_access_codes = 5
 num_streams = 2
 
 parser = OptionParser()
@@ -31,6 +31,19 @@ tx_sig1  = sp.fromfile(open("/tmp/tx_sig1.dat"), dtype=sp.complex64)
 tx_sig2  = sp.fromfile(open("/tmp/tx_sig2.dat"), dtype=sp.complex64)
 rx_sig1  = sp.fromfile(open("/tmp/rx_sig1.dat"), dtype=sp.complex64)
 rx_sig2  = sp.fromfile(open("/tmp/rx_sig2.dat"), dtype=sp.complex64)
+tx_data1  = sp.fromfile(open("/tmp/tx_data1.dat"), dtype=sp.int32)
+tx_data2  = sp.fromfile(open("/tmp/tx_data2.dat"), dtype=sp.int32)
+rx_data1  = sp.fromfile(open("/tmp/rx_data1.dat"), dtype=sp.int32)
+rx_data2  = sp.fromfile(open("/tmp/rx_data2.dat"), dtype=sp.int32)
+diff1 = sp.zeros((len(rx_data1), ), sp.int32)
+diff2 = sp.zeros((len(rx_data2), ), sp.int32)
+
+for i in range(len(rx_data1)):
+  if(rx_data1[i] != tx_data1[i]):
+    diff1[i] = 1
+  if(rx_data2[i] != tx_data2[i]):
+    diff2[i] = 1
+
 f_s0 = []
 f_s1 = []
 for chan in range(num_streams):
@@ -58,8 +71,6 @@ if(options.txsamples != None):
   txend = 0 + options.txsamples
 else:
   txend = len(tx1)
-
-print len(f_sc1), len(f_sc2)
 
 tx, tx_axarr = plt.subplots(2, sharex=True)
 title = "TX Signal"
@@ -107,4 +118,10 @@ sig_ax[3].plot([x.real for x in rx_sig2], label="Real")
 sig_ax[3].plot([x.imag for x in rx_sig2], label="Imag")
 sig_ax[0].legend(loc=0)
 sig_ax[1].legend(loc=0)
+
+diff, diff_ax = plt.subplots(2, sharex=True)
+diff_ax[0].set_title("Diff")
+diff_ax[0].plot(diff1)
+diff_ax[1].plot(diff2)
+
 plt.show()

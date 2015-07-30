@@ -23,12 +23,6 @@
 #include <volk/volk_malloc.h>
 #include <string.h>
 
-#define DEBUG_LOG                 true
-#define ADD_NULL_CARRIERS         false
-#define F_SC_DEBUG_OUT_PREFIX     "/tmp/f_sc_"
-#define CORR_FILE_PREFIX          "/tmp/corr_"
-#define PLATEAU_THREASHOLD        0.95
-
 float sqrt2 = sqrtf(2.0);
 
 gr_complex CHANNEL_I[2][2] =
@@ -679,9 +673,9 @@ namespace rx_beamforming {
 	fftwf_execute(fft[chan]);
 	// correlate with S0
         volk_32fc_x2_conjugate_dot_prod_32fc(&xyz,
-      					 X[chan],
-      					 S0,
-      					 M);
+					     X[chan],
+					     S0,
+					     M);
         s0_corr[chan][sample] = real(xyz)*real(xyz) + imag(xyz)*imag(xyz);
         if(s0_corr[chan][sample] > max_s0_corr[chan]) {
           max_s0_corr[chan] = s0_corr[chan][sample];
@@ -724,6 +718,11 @@ namespace rx_beamforming {
       for(unsigned int rx_stream = 0; rx_stream < num_streams; rx_stream++) {
 	for(unsigned int tx_stream = 0; tx_stream < num_streams; tx_stream++) {
 	  _ac_id = code*num_streams + tx_stream;
+	  printf("code: %u, estimating channel between rx: %u, tx: %u, ac_id: %u\n",
+		 code,
+		 rx_stream,
+		 tx_stream,
+		 _ac_id);
 	  memmove(x[rx_stream],
 		  buffer_ptr[rx_stream] + corr_indices[rx_stream][_ac_id],
 		  sizeof(gr_complex)*M);
@@ -853,6 +852,13 @@ namespace rx_beamforming {
 namespace tx_beamforming {
 }
 
+#if USE_ALL_CARRIERS
+void ofdmframe_init_default_sctype(unsigned char * _p, unsigned int _M)
+{
+    for (unsigned int i=0; i<_M; i++)
+        _p[i] = OFDMFRAME_SCTYPE_DATA;
+}
+#else
 void ofdmframe_init_default_sctype(unsigned char * _p, unsigned int _M)
 {
     // validate input
@@ -895,6 +901,7 @@ void ofdmframe_init_default_sctype(unsigned char * _p, unsigned int _M)
             _p[k] = OFDMFRAME_SCTYPE_DATA;
     }
 }
+#endif
 
 void ofdmframe_validate_sctype(const unsigned char * _p,
                                unsigned int _M,
@@ -997,6 +1004,45 @@ void ofdmframe_init_S0(const unsigned char * _p,
         _s0[i] *= g;
 }
 
+#if MAKE_S1_QPSK
+void ofdmframe_init_S1(const unsigned char * _p,
+                       unsigned int _M,
+                       unsigned int _num_access_codes,
+                       std::complex<float> * _S1,
+                       std::complex<float> * _s1,
+                       msequence ms)
+{
+    unsigned int i, j;
+
+    unsigned int s;
+    unsigned int M_S1 = 0;
+
+    // long sequence
+    for(j = 0; j < _num_access_codes; j++) {
+      for (i=0; i<_M; i++) {
+        // generate symbol
+        // s = msequence_generate_symbol(ms,1);
+        s = msequence_generate_symbol(ms,2) & 0x11;
+	assert(s < 4);
+
+        if (_p[i] == OFDMFRAME_SCTYPE_NULL) {
+            // NULL subcarrier
+            (_S1 + _M*j)[i] = 0.0f;
+        } else {
+	  (_S1 + _M*j)[i] = QPSK_CONSTELLATION[s];
+          M_S1++;
+        }
+      }
+      // run inverse fft to get time-domain sequence
+      fft_run(_M, _S1 + _M*j, _s1 + _M*j, LIQUID_FFT_BACKWARD, 0);
+    }
+
+    // normalize time-domain sequence level
+    float g = 1.0f / sqrtf(M_S1/_num_access_codes);
+    for (i=0; i<_M*_num_access_codes; i++)
+        _s1[i] *= g;
+}
+#else
 void ofdmframe_init_S1(const unsigned char * _p,
                        unsigned int _M,
                        unsigned int _num_access_codes,
@@ -1015,13 +1061,14 @@ void ofdmframe_init_S1(const unsigned char * _p,
         // generate symbol
         // s = msequence_generate_symbol(ms,1);
         s = msequence_generate_symbol(ms,3) & 0x01;
+	assert(s < 2);
 
         if (_p[i] == OFDMFRAME_SCTYPE_NULL) {
             // NULL subcarrier
             (_S1 + _M*j)[i] = 0.0f;
         } else {
-            (_S1 + _M*j)[i] = s ? 1.0f : -1.0f;
-            M_S1++;
+	  (_S1 + _M*j)[i] = BPSK_CONSTELLATION[s];
+          M_S1++;
         }
       }
       // run inverse fft to get time-domain sequence
@@ -1033,6 +1080,7 @@ void ofdmframe_init_S1(const unsigned char * _p,
     for (i=0; i<_M*_num_access_codes; i++)
         _s1[i] *= g;
 }
+#endif
 
 void invert(std::vector<std::vector<gr_complex> >  &W,
 	    std::vector<std::vector<gr_complex> > const &G) {
@@ -1043,8 +1091,8 @@ void invert(std::vector<std::vector<gr_complex> >  &W,
     assert(W[rx_stream].size() == 2);
   }
   gr_complex det = G[0][0]*G[1][1] - G[0][1]*G[1][0];
-  //  gr_complex det_inv = 1.0f/det;
-  gr_complex det_inv = conj(det);
+  gr_complex det_inv = 1.0f/det;
+  //  gr_complex det_inv = conj(det);
   W[0][0] = det_inv*G[1][1];
   W[1][1] = det_inv*G[0][0];
   W[1][0] = -det_inv*G[1][0];

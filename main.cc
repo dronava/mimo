@@ -28,71 +28,7 @@
 #include <unistd.h>
 #include <gnuradio/gr_complex.h>
 #include "framing.h"
-
-// define default configurations
-// USRP identities
-#define N200_12             "addr=134.147.118.212"
-#define N200_15             "addr=134.147.118.215"
-#define X300A               "addr=134.147.118.216"
-#define X300B               "addr=134.147.118.217"
-#define B210_TX             "serial=308F955"
-#define B210_RX             "serial=308F965"
-
-// subdevice specifications
-#define X300_SUBDEV_SPEC    "A:0 B:0"
-#define N200_SUBDEV_SPEC    "A:0"
-#define B210_SUBDEV_SPEC_TX "A:B A:A"
-#define B210_SUBDEV_SPEC_RX "A:A A:B"
-
-// tx/rx streamer configurations
-#define CPU                 "fc32"
-#define WIRE                "sc16"
-
-// RF front end configurations
-#define CENTER_FREQUENCY    5100e6
-#define SAMPLING_RATE       1e6
-#define TX_FRONTEND_GAIN    45.0
-#define RX_FRONTEND_GAIN    45.0
-
-// device synchronization configurations
-typedef enum
-{
-  CLOCK_SOURCE_NONE = 0,
-  CLOCK_SOURCE_EXTERNAL
-} clock_source_type;
-typedef enum
-{
-  TIME_SOURCE_NONE = 0,
-  TIME_SOURCE_EXTERNAL
-} time_source_type;
-#define CLOCK_SOURCE        CLOCK_SOURCE_EXTERNAL
-#define TIME_SOURCE         TIME_SOURCE_NONE
-
-// OFDM configurations
-#define NUM_SUBCARRIERS     64
-#define CP_LENGTH           16
-#define BASEBAND_GAIN       0.25
-#define NUM_ACCESS_CODES    3
-#define NUM_STREAMS	    2
-
-#define MODEM_SCHEME        LIQUID_MODEM_DPSK4
-#define ARITY               4
-
-// generator polynomials obtained from
-// primitive_polys.pdf
-#define LFSR_SMALL_LENGTH   	12
-#define LFSR_LARGE_LENGTH   	13
-#define LFSR_SMALL_0_GEN_POLY 	010123
-#define LFSR_SMALL_1_GEN_POLY 	010151
-#define LFSR_LARGE_0_GEN_POLY 	020033
-#define LFSR_LARGE_1_GEN_POLY 	020047
-
-// misc configurations
-#define VERBOSITY		true
-#define LOG                 	true
-#define LOG_DIR             	"/tmp/"
-#define DATA_DIR		"data/"
-#define TX_BEAMFORMING		0
+#include "config.h"
 
 namespace po = boost::program_options;
 
@@ -101,6 +37,7 @@ unsigned int pid;
 unsigned int num_frames_detected;
 unsigned int num_valid_headers_received;
 unsigned int num_valid_bytes_received;
+std::vector<unsigned int> num_valid_bytes;
 unsigned int num_valid_packets_received;
 time_t tx_begin, tx_end, rx_begin, rx_end;
 unsigned long int tx_sig_len;
@@ -1211,6 +1148,8 @@ int UHD_SAFE_MAIN(int argc, char **argv)
   std::vector<FILE *> rx_data_fp;
   std::vector<FILE *> rx_sig_fp;
 
+  srand(time(NULL));
+
   ms_S1.resize(num_streams);
   p = (unsigned char *) malloc (sizeof(unsigned char)*M);
   ofdmframe_init_default_sctype(p, M);
@@ -1220,6 +1159,7 @@ int UHD_SAFE_MAIN(int argc, char **argv)
   num_occupied_carriers = num_pilot_carriers + num_data_carriers;
   tx_sig_len = num_occupied_carriers*PID_MAX;
   for(unsigned int chan = 0; chan < num_streams; chan++) {
+    num_valid_bytes.push_back(0);
     mod.push_back(modem_create(MODEM_SCHEME));
     dem.push_back(modem_create(MODEM_SCHEME));
     tx_sig.push_back((gr_complex *) malloc 
@@ -1398,18 +1338,18 @@ int UHD_SAFE_MAIN(int argc, char **argv)
 
   // demodulation
 #if SISO
-  unsigned int chan = 0;
   for(unsigned int sample = 0; sample < tx_sig_len; sample++) {
-    modem_demodulate(dem[chan], rx_sig[chan][sample], rx_data[chan] + sample);
-    if(rx_data[chan][sample] == tx_data[chan][sample])
+    modem_demodulate(dem[SISO_RX], rx_sig[SISO_RX][sample], rx_data[SISO_RX] + sample);
+    if(rx_data[SISO_RX][sample] == tx_data[SISO_TX][sample])
       num_valid_bytes_received++;
   }
 #else
   for(unsigned int chan = 0; chan < num_streams; chan++) {
     for(unsigned int sample = 0; sample < tx_sig_len; sample++) {
       modem_demodulate(dem[chan], rx_sig[chan][sample], rx_data[chan] + sample);
-      if(rx_data[chan][sample] == tx_data[chan][sample])
-	num_valid_bytes_received++;
+      if(rx_data[chan][sample] == tx_data[chan][sample]) {
+	num_valid_bytes[chan]++;
+      }
     }
   }
 #endif
@@ -1451,11 +1391,16 @@ int UHD_SAFE_MAIN(int argc, char **argv)
   printf("    frames detected         : %6u\n", num_frames_detected);
   printf("    valid headers           : %6u\n", num_valid_headers_received);
   printf("    valid packets           : %6u\n", num_valid_packets_received);
-  printf("    valid symbols received  : %6u\n", num_valid_bytes_received);
 #if SISO
-  printf("    symbol error rate       : %1.6f%%\n", (float(tx_sig_len - num_valid_bytes_received)/float(tx_sig_len))*100);
+  printf("    valid symbols received  : %6u\n", num_valid_bytes_received);
+  printf("    symbol error rate       : %1.6f%%\n",
+	 (float(tx_sig_len - num_valid_bytes_received)/float(tx_sig_len))*100);
 #else
-  printf("    symbol error rate       : %1.6f%%\n", (float(num_streams*tx_sig_len - num_valid_bytes_received)/float(num_streams*tx_sig_len))*100);
+  for(unsigned int chan = 0; chan < num_streams; chan++) {
+    printf("    valid symbols received %u: %6u\n", chan, num_valid_bytes[chan]);
+    printf("    symbol error rate      %u: %1.6f%%\n", chan,
+	   (float(tx_sig_len - num_valid_bytes[chan])/float(tx_sig_len))*100);
+  }
 #endif
   printf("    tx run time             : %6lu\n", tx_end - tx_begin);
   printf("    rx run time             : %6lu\n", rx_end - rx_begin);

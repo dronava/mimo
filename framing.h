@@ -24,13 +24,7 @@
 #include <complex>
 #include <liquid/liquid.h>
 #include <boost/format.hpp>
-
-#define SISO         true
-#define SISO_TX      0
-#define SISO_RX      1
-#define PID_MAX      100
-#define DEBUG_PRINT  true
-#define DEBUG_PRINT_VERBOSE false
+#include "config.h"
 
 // callback
 typedef void * (* mimo_callback) (std::vector<gr_complex *>,
@@ -43,13 +37,6 @@ typedef enum {
   STATE_WAIT,
   STATE_MIMO
 } framesync_states_t;
-
-#define BPSK_CONSTELLATION_SIZE 2
-#define QPSK_CONSTELLATION_SIZE 4
-extern gr_complex BPSK_CONSTELLATION[BPSK_CONSTELLATION_SIZE];
-extern gr_complex QPSK_CONSTELLATION[QPSK_CONSTELLATION_SIZE];
-#define CONSTELLATION BPSK_CONSTELLATION
-#define CONSTELLATION_SIZE BPSK_CONSTELLATION_SIZE
 
 namespace rx_beamforming {
   class framegen {
