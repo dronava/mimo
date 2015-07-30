@@ -65,7 +65,7 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define CP_LENGTH               16
 #define BASEBAND_GAIN           0.25
 #define NUM_ACCESS_CODES        5
-#define NUM_STREAMS	            2
+#define NUM_STREAMS	        2
 
 #define MODEM_SCHEME            LIQUID_MODEM_DPSK2
 #define ARITY                   2
@@ -73,18 +73,18 @@ extern gr_complex QPSK_CONSTELLATION[];
 // generator polynomials obtained from
 // primitive_polys.pdf
 #define LFSR_SMALL_LENGTH       12
-#define LFSR_LARGE_LENGTH   	  13
+#define LFSR_LARGE_LENGTH   	13
 #define LFSR_SMALL_0_GEN_POLY 	010123
 #define LFSR_SMALL_1_GEN_POLY 	010151
 #define LFSR_LARGE_0_GEN_POLY 	020033
 #define LFSR_LARGE_1_GEN_POLY 	020047
 
 // misc configurations
-#define VERBOSITY		            true
-#define LOG                 	  true
-#define LOG_DIR             	  "/tmp/"
-#define DATA_DIR		            "data/"
-#define TX_BEAMFORMING		      0
+#define VERBOSITY		true
+#define LOG                 	true
+#define LOG_DIR             	"/tmp/"
+#define DATA_DIR		"data/"
+#define TX_BEAMFORMING		0
 
 #define DEBUG_LOG               true
 #define ADD_NULL_CARRIERS       false
@@ -104,5 +104,6 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define CONSTELLATION           BPSK_CONSTELLATION
 #define CONSTELLATION_SIZE      BPSK_CONSTELLATION_SIZE
 #define MAKE_S1_QPSK            false
+#define INVERT_CHANNEL          false
 
 #endif

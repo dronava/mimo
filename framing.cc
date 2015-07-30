@@ -735,11 +735,12 @@ namespace rx_beamforming {
       }
     }
     
-    // computing receive beamformer
+#if INVERT_CHANNEL
     for(unsigned int i = 0; i < M; i++) {
       if(p[i] != OFDMFRAME_SCTYPE_NULL) 
         invert(W[i], G[i]);
     }
+#endif
 
 #if DEBUG_PRINT
     for(unsigned int rx_stream = 0; rx_stream < num_streams; rx_stream++) {
