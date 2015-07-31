@@ -67,6 +67,7 @@ namespace rx_beamforming {
     gr_complex g_data;
     // transform object
     std::vector<fftwf_plan> ifft;
+    gr_complex dft_normalizer;
     // PLCP short
     gr_complex * S0;
     gr_complex * s0;
@@ -138,6 +139,7 @@ namespace rx_beamforming {
     std::vector<std::vector<std::vector<gr_complex> > > W;
     // transform object
     std::vector<fftwf_plan> fft;
+    gr_complex dft_normalizer;
     // PLCP short
     gr_complex * S0;
     gr_complex * s0;

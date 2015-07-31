@@ -1180,10 +1180,23 @@ int UHD_SAFE_MAIN(int argc, char **argv)
       }
     }
 #else
+#if SAME_SIGNAL_ON_ALL_TX
+    if(chan == 0) {
+      for(unsigned int sample = 0; sample < tx_sig_len; sample++) {
+        tx_data[chan][sample] = rand() % ARITY;
+        modem_modulate(mod[chan], tx_data[chan][sample], tx_sig[chan] + sample);
+      }
+    }
+    else {
+      memmove(tx_data[chan], tx_data[0], sizeof(unsigned int)*tx_sig_len);
+      memmove(tx_sig[chan], tx_sig[0], sizeof(gr_complex)*tx_sig_len);
+    }
+#else
     for(unsigned int sample = 0; sample < tx_sig_len; sample++) {
       tx_data[chan][sample] = rand() % ARITY;
       modem_modulate(mod[chan], tx_data[chan][sample], tx_sig[chan] + sample);
     }
+#endif
 #endif
   }
 #if LOG
@@ -1340,8 +1353,9 @@ int UHD_SAFE_MAIN(int argc, char **argv)
 #if SISO
   for(unsigned int sample = 0; sample < tx_sig_len; sample++) {
     modem_demodulate(dem[SISO_RX], rx_sig[SISO_RX][sample], rx_data[SISO_RX] + sample);
-    if(rx_data[SISO_RX][sample] == tx_data[SISO_TX][sample])
+    if(rx_data[SISO_RX][sample] == tx_data[SISO_TX][sample]) {
       num_valid_bytes_received++;
+    }
   }
 #else
   for(unsigned int chan = 0; chan < num_streams; chan++) {

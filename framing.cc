@@ -112,7 +112,7 @@ namespace rx_beamforming {
                       S0,
                       s0,
                       _ms_S0);
-    g_data = 1.0f / sqrtf(M_pilot + M_data);
+    dft_normalizer = 1.0f / sqrtf(M_pilot + M_data);
   
     // get volk alignment for volk_malloc
     size_t volk_alignment = volk_get_alignment();
@@ -133,8 +133,8 @@ namespace rx_beamforming {
       assert(volk_is_aligned(X[i]));
       assert(volk_is_aligned(x[i]));
       ifft[i] = fftwf_plan_dft_1d(M,
-                                reinterpret_cast<fftwf_complex *>(X[i]),
-                                reinterpret_cast<fftwf_complex *>(x[i]),
+                                  reinterpret_cast<fftwf_complex *>(X[i]),
+                                  reinterpret_cast<fftwf_complex *>(x[i]),
                                   FFTW_BACKWARD,
                                   FFTW_ESTIMATE);
       // initialize S1 sequence
@@ -221,7 +221,7 @@ namespace rx_beamforming {
           X[stream][i] = in_buff[stream][j++];
       }
       fftwf_execute(ifft[stream]);
-      volk_32fc_s32fc_multiply_32fc(volk_buff_fc1, x[stream], g_data, M);
+      volk_32fc_s32fc_multiply_32fc(volk_buff_fc1, x[stream], dft_normalizer, M);
       // cyclic prefix
       memmove(tx_buff[stream],
               volk_buff_fc1 + M - cp_len,
@@ -284,6 +284,7 @@ namespace rx_beamforming {
     access_code_buffer_len = symbol_len*(num_access_codes*num_streams + 4);
     tx_sig_len = PID_MAX*symbol_len;
     callback = _callback;
+    dft_normalizer = sqrt(1.0/float(M));
   
     // resize vectors to num stream
     G.resize(M);
@@ -326,12 +327,8 @@ namespace rx_beamforming {
                               &M_pilot,
                               &M_data);
     M_occupied = M_data + M_pilot;
-    // initialize S0 sequence
-    ofdmframe_init_S0(p,
-                      M,
-                      S0,
-                      s0,
-                      _ms_S0);
+    dft_normalizer = 1.0f / sqrtf(M_occupied);
+
 
     // Schmidl & Cox
     delay_M2.resize(num_streams);
@@ -369,8 +366,8 @@ namespace rx_beamforming {
       assert(volk_is_aligned(X[i]));
       assert(volk_is_aligned(x[i]));
       fft[i] = fftwf_plan_dft_1d(M,
-                               reinterpret_cast<fftwf_complex *>(x[i]),
-                               reinterpret_cast<fftwf_complex *>(X[i]),
+                                 reinterpret_cast<fftwf_complex *>(x[i]),
+                                 reinterpret_cast<fftwf_complex *>(X[i]),
                                  FFTW_FORWARD,
                                  FFTW_ESTIMATE);
       // initialize S1 sequence
@@ -404,6 +401,12 @@ namespace rx_beamforming {
       }
 #endif
     }
+    // initialize S0 sequence
+    ofdmframe_init_S0(p,
+                      M,
+                      S0,
+                      s0,
+                      _ms_S0);
     volk_buff_fc1 = (std::complex<float> *) volk_malloc 
                     (sizeof(std::complex<float>)*M,
                      volk_alignment);
@@ -504,6 +507,11 @@ namespace rx_beamforming {
       return;
     memmove(x[siso_rx], symbol[siso_rx] + cp_len, sizeof(gr_complex)*M);
     fftwf_execute(fft[siso_rx]);
+    volk_32fc_s32fc_multiply_32fc(volk_buff_fc1,
+                                  X[siso_rx],
+                                  dft_normalizer,
+                                  M);
+    memmove(X[siso_rx], volk_buff_fc1, sizeof(gr_complex)*M);
     for(unsigned int stream = 0; stream < num_streams; stream++) {
       std::fill(x[stream], x[stream] + M, gr_complex(0.0, 0.0));
     }
@@ -544,6 +552,11 @@ namespace rx_beamforming {
       memmove(x[rx_stream], symbol[rx_stream] + cp_len,
               sizeof(gr_complex)*M);
       fftwf_execute(fft[rx_stream]);
+      volk_32fc_s32fc_multiply_32fc(volk_buff_fc1,
+                                    X[rx_stream],
+                                    dft_normalizer,
+                                    M);
+      memmove(X[rx_stream], volk_buff_fc1, sizeof(gr_complex)*M);                                    
     }
     // FIXME works only for 2 x 2.
     // Extend for higher configurations
@@ -671,6 +684,12 @@ namespace rx_beamforming {
       for(unsigned int chan = 0; chan < num_streams; chan++) {
         memmove(x[chan], buffer_ptr[chan] + sample, sizeof(gr_complex)*M);
         fftwf_execute(fft[chan]);
+        // normalize
+        volk_32fc_s32fc_multiply_32fc(volk_buff_fc1,
+                                      X[chan],
+                                      dft_normalizer,
+                                      M);
+        memmove(X[chan], volk_buff_fc1, sizeof(gr_complex)*M);
         // correlate with S0
         volk_32fc_x2_conjugate_dot_prod_32fc(&xyz,
                                              X[chan],
@@ -718,11 +737,6 @@ namespace rx_beamforming {
       for(unsigned int rx_stream = 0; rx_stream < num_streams; rx_stream++) {
         for(unsigned int tx_stream = 0; tx_stream < num_streams; tx_stream++) {
           _ac_id = code*num_streams + tx_stream;
-          printf("code: %u, estimating channel between rx: %u, tx: %u, ac_id: %u\n",
-                 code,
-                 rx_stream,
-                 tx_stream,
-                 _ac_id);
           memmove(x[rx_stream],
                   buffer_ptr[rx_stream] + corr_indices[rx_stream][_ac_id],
                   sizeof(gr_complex)*M);
@@ -731,6 +745,15 @@ namespace rx_beamforming {
             if(p[i] != OFDMFRAME_SCTYPE_NULL)
               G[i][rx_stream][tx_stream] += X[rx_stream][i]/S1[tx_stream][code*M + i];
           }
+        }
+      }
+    }
+    
+    for(unsigned int rx_stream = 0; rx_stream < num_streams; rx_stream++) {
+      for(unsigned int tx_stream = 0; tx_stream < num_streams; tx_stream++) {
+        for(unsigned int sc = 0; sc < M; sc++) {
+          if(p[sc] != OFDMFRAME_SCTYPE_NULL)
+            G[sc][rx_stream][tx_stream] *= dft_normalizer/float(num_access_codes);
         }
       }
     }
@@ -957,6 +980,7 @@ void ofdmframe_print_sctype(const unsigned char * _p, unsigned int _M)
     printf("]\n");
 }
 
+#if USE_NEW_INIT_S0
 void ofdmframe_init_S0(const unsigned char * _p,
                        unsigned int _M,
                        std::complex<float> * _S0,
@@ -964,14 +988,71 @@ void ofdmframe_init_S0(const unsigned char * _p,
                        msequence ms)
 {
     unsigned int i;
-
     unsigned int s;
     unsigned int M_S0 = 0;
+    fftwf_plan ifft;
+    gr_complex * X = (gr_complex *) fftwf_malloc (sizeof(gr_complex)*_M);
+    gr_complex * x = (gr_complex *) fftwf_malloc (sizeof(gr_complex)*_M);
+    ifft = fftwf_plan_dft_1d(_M,
+                             reinterpret_cast<fftwf_complex *>(X),
+                             reinterpret_cast<fftwf_complex *>(x),
+                             FFTW_BACKWARD,
+                             FFTW_ESTIMATE);
 
     // short sequence
     for (i=0; i<_M; i++) {
         // generate symbol
-        s = msequence_generate_symbol(ms,3) & 0x01;
+        s = msequence_generate_symbol(ms, 1) & 0x01;
+
+        if (_p[i] == OFDMFRAME_SCTYPE_NULL) {
+            // NULL subcarrier
+            _S0[i] = 0.0f;
+        } else {
+            if ( (i%2) == 0 ) {
+                // even subcarrer
+                _S0[i] = s ? 1.0f : -1.0f;
+                M_S0++;
+            } else {
+                // odd subcarrer (ignore)
+                _S0[i] = 0.0f;
+            }
+        }
+    }
+
+    // ensure at least one subcarrier was enabled
+    if (M_S0 == 0) {
+        fprintf(stderr,"error: ofdmframe_init_S0(), no subcarriers enabled; check allocation\n");
+        exit(1);
+    }
+
+    // run inverse fft to get time-domain sequence
+    // TODO make in independent of liquid
+    gr_complex dft_normalizer = sqrt(1.0/float(M_S0));
+
+    memmove(X, _S0, sizeof(gr_complex)*_M);
+    fftwf_execute(ifft);
+    volk_32fc_s32fc_multiply_32fc(_s0,
+                                  x,
+                                  dft_normalizer,
+                                  _M);
+    fftwf_destroy_plan(ifft);
+    fftwf_free(X);
+    fftwf_free(x);
+}
+#else
+void ofdmframe_init_S0(const unsigned char * _p,
+                       unsigned int _M,
+                       std::complex<float> * _S0,
+                       std::complex<float> * _s0,
+                       msequence ms)
+{
+    unsigned int i;
+    unsigned int s;
+    unsigned int M_S0 = 0;
+    // short sequence
+    for (i=0; i<_M; i++) {
+        // generate symbol
+        s = msequence_generate_symbol(ms, 3) & 0x01;
 
         if (_p[i] == OFDMFRAME_SCTYPE_NULL) {
             // NULL subcarrier
@@ -1002,9 +1083,115 @@ void ofdmframe_init_S0(const unsigned char * _p,
     // TODO Do this with volk
     float g = 1.0f / sqrtf(M_S0);
     for (i=0; i<_M; i++)
-        _s0[i] *= g;
+      _s0[i] *= g;
 }
+#endif
 
+#if USE_NEW_INIT_S1
+#if MAKE_S1_QPSK
+void ofdmframe_init_S1(const unsigned char * _p,
+                       unsigned int _M,
+                       unsigned int _num_access_codes,
+                       std::complex<float> * _S1,
+                       std::complex<float> * _s1,
+                       msequence ms)
+{
+    unsigned int i, j;
+
+    unsigned int s;
+    unsigned int M_S1 = 0;
+    fftwf_plan ifft;
+    gr_complex * X = (gr_complex *) fftwf_malloc (sizeof(gr_complex)*_M);
+    gr_complex * x = (gr_complex *) fftwf_malloc (sizeof(gr_complex)*_M);
+    gr_complex dft_normalizer = sqrt(1.0/float(_M));
+    ifft = fftwf_plan_dft_1d(_M,
+                             reinterpret_cast<fftwf_complex *>(X),
+                             reinterpret_cast<fftwf_complex *>(x),
+                             FFTW_BACKWARD,
+                             FFTW_ESTIMATE);
+
+    // long sequence
+    for(j = 0; j < _num_access_codes; j++) {
+      M_S1 = 0;
+      for (i=0; i<_M; i++) {
+        // generate symbol
+        // s = msequence_generate_symbol(ms,1);
+        s = msequence_generate_symbol(ms,2) & 0x11;
+        assert(s < 4);
+
+        if (_p[i] == OFDMFRAME_SCTYPE_NULL) {
+            // NULL subcarrier
+            (_S1 + _M*j)[i] = 0.0f;
+        } else {
+          (_S1 + _M*j)[i] = QPSK_CONSTELLATION[s];
+          M_S1++;
+        }
+      }
+      // run inverse fft to get time-domain sequence
+      memmove(X, _S1 + _M*j, sizeof(gr_complex)*_M);
+      fftwf_execute(ifft);
+      dft_normalizer = sqrt(1.0/float(M_S1));
+      volk_32fc_s32fc_multiply_32fc(_s1 + _M*j,
+                                    x,
+                                    dft_normalizer,
+                                    _M);
+    }
+    fftwf_destroy_plan(ifft);
+    fftwf_free(X);
+    fftwf_free(x);
+}
+#else
+void ofdmframe_init_S1(const unsigned char * _p,
+                       unsigned int _M,
+                       unsigned int _num_access_codes,
+                       std::complex<float> * _S1,
+                       std::complex<float> * _s1,
+                       msequence ms)
+{
+    unsigned int i, j;
+
+    unsigned int s;
+    unsigned int M_S1 = 0;
+    fftwf_plan ifft;
+    gr_complex * X = (gr_complex *) fftwf_malloc (sizeof(gr_complex)*_M);
+    gr_complex * x = (gr_complex *) fftwf_malloc (sizeof(gr_complex)*_M);
+    gr_complex dft_normalizer = sqrt(1.0/float(_M));
+    ifft = fftwf_plan_dft_1d(_M,
+                             reinterpret_cast<fftwf_complex *>(X),
+                             reinterpret_cast<fftwf_complex *>(x),
+                             FFTW_BACKWARD,
+                             FFTW_ESTIMATE);
+
+    // long sequence
+    for(j = 0; j < _num_access_codes; j++) {
+      for (i=0; i<_M; i++) {
+        // generate symbol
+        // s = msequence_generate_symbol(ms,1);
+        s = msequence_generate_symbol(ms,1) & 0x01;
+        assert(s < 2);
+
+        if (_p[i] == OFDMFRAME_SCTYPE_NULL) {
+            // NULL subcarrier
+            (_S1 + _M*j)[i] = 0.0f;
+        } else {
+          (_S1 + _M*j)[i] = BPSK_CONSTELLATION[s];
+          M_S1++;
+        }
+      }
+      // run inverse fft to get time-domain sequence
+      memmove(X, _S1 + _M*j, sizeof(gr_complex)*_M);
+      fftwf_execute(ifft);
+      volk_32fc_s32fc_multiply_32fc(_s1 + _M*j,
+                                    x,
+                                    dft_normalizer,
+                                    _M);
+    }
+    fftwf_destroy_plan(ifft);
+    fftwf_free(X);
+    fftwf_free(x);
+}
+#endif
+#else
 #if MAKE_S1_QPSK
 void ofdmframe_init_S1(const unsigned char * _p,
                        unsigned int _M,
@@ -1082,6 +1269,7 @@ void ofdmframe_init_S1(const unsigned char * _p,
         _s1[i] *= g;
 }
 #endif
+#endif
 
 void invert(std::vector<std::vector<gr_complex> >  &W,
             std::vector<std::vector<gr_complex> > const &G) {
@@ -1092,8 +1280,11 @@ void invert(std::vector<std::vector<gr_complex> >  &W,
     assert(W[rx_stream].size() == 2);
   }
   gr_complex det = G[0][0]*G[1][1] - G[0][1]*G[1][0];
+#if INVERT_TO_UNITY
   gr_complex det_inv = 1.0f/det;
-  //  gr_complex det_inv = conj(det);
+#else
+  gr_complex det_inv = conj(det);
+#endif
   W[0][0] = det_inv*G[1][1];
   W[1][1] = det_inv*G[0][0];
   W[1][0] = -det_inv*G[1][0];

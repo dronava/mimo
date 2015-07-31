@@ -53,33 +53,33 @@ extern gr_complex QPSK_CONSTELLATION[];
 
 // RF front end configurations
 #define CENTER_FREQUENCY        5100e6
-#define SAMPLING_RATE           1e6
-#define TX_FRONTEND_GAIN        60.0
+#define SAMPLING_RATE           1.0e6
+#define TX_FRONTEND_GAIN        80.0
 #define RX_FRONTEND_GAIN        45.0
+#define BASEBAND_GAIN           0.25
 
 #define CLOCK_SOURCE            CLOCK_SOURCE_EXTERNAL
 #define TIME_SOURCE             TIME_SOURCE_NONE
 
 // OFDM configurations
-#define NUM_SUBCARRIERS         64
-#define CP_LENGTH               16
-#define BASEBAND_GAIN           0.25
+#define NUM_SUBCARRIERS         1024
+#define CP_LENGTH               64
 
 // generator polynomials obtained from
 // primitive_polys.pdf
 #define LFSR_SMALL_LENGTH       12
-#define LFSR_LARGE_LENGTH   	13
-#define LFSR_SMALL_0_GEN_POLY 	010123
-#define LFSR_SMALL_1_GEN_POLY 	010151
-#define LFSR_LARGE_0_GEN_POLY 	020033
-#define LFSR_LARGE_1_GEN_POLY 	020047
+#define LFSR_LARGE_LENGTH       13
+#define LFSR_SMALL_0_GEN_POLY   010123
+#define LFSR_SMALL_1_GEN_POLY   010151
+#define LFSR_LARGE_0_GEN_POLY   020033
+#define LFSR_LARGE_1_GEN_POLY   020047
 
 // misc configurations
-#define VERBOSITY		true
-#define LOG                 	true
-#define LOG_DIR             	"/tmp/"
-#define DATA_DIR		"data/"
-#define TX_BEAMFORMING		0
+#define VERBOSITY               true
+#define LOG                     true
+#define LOG_DIR                 "/tmp/"
+#define DATA_DIR                "data/"
+#define TX_BEAMFORMING          0
 
 #define DEBUG_LOG               true
 #define ADD_NULL_CARRIERS       false
@@ -90,7 +90,7 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define SISO                    false
 #define SISO_TX                 1
 #define SISO_RX                 1
-#define PID_MAX                 100
+#define PID_MAX                 1000
 #define DEBUG_PRINT             true
 #define DEBUG_PRINT_VERBOSE     false
 #define USE_ALL_CARRIERS        true
@@ -100,10 +100,16 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define CONSTELLATION_SIZE      BPSK_CONSTELLATION_SIZE
 #define MAKE_S1_QPSK            false
 #define INVERT_CHANNEL          true
+#define INVERT_TO_UNITY         false
 #define NUM_ACCESS_CODES        5
 #define NUM_MIMO_ACCESS_CODES   3
-#define NUM_STREAMS	        2
-#define MODEM_SCHEME            LIQUID_MODEM_DPSK4
-#define ARITY                   4
+#define NUM_STREAMS             2
+#define MODEM_SCHEME            LIQUID_MODEM_QAM16
+#define ARITY                   16
+#define SAME_SIGNAL_ON_ALL_TX   false
+#define NORMALIZE_DFT_TXRX      true
+#define NORMALIZE_DFT_RX        true
+#define USE_NEW_INIT_S0         true
+#define USE_NEW_INIT_S1         true
 
 #endif

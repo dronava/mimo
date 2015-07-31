@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from cmath import phase, sqrt
 from math import pi
 from optparse import OptionParser
+import sys
 
 num_access_codes = 5
 num_streams = 2
@@ -18,6 +19,7 @@ parser.add_option("-N", "--num-tx-samples", type="int",
                   dest="txsamples")
 parser.add_option("-p", "--plateau-index", type="int",
                   dest="plateau_index")
+parser.add_option("-d", "--diff", action="store_true", dest="print_diff", default=False)
 
 (options, args) = parser.parse_args()
 
@@ -43,6 +45,20 @@ for i in range(len(rx_data1)):
     diff1[i] = 1
   if(rx_data2[i] != tx_data2[i]):
     diff2[i] = 1
+
+if(options.print_diff):
+  for i in range(len(rx_data1)):
+    if(diff1[i]):
+      sys.stdout.write('x')
+    else:
+      sys.stdout.write('-')
+  print 
+  for i in range(len(rx_data2)):
+    if(diff2[i]):
+      sys.stdout.write('x')
+    else:
+      sys.stdout.write('-')
+
 
 f_s0 = []
 f_s1 = []
@@ -119,9 +135,9 @@ sig_ax[3].plot([x.imag for x in rx_sig2], label="Imag")
 sig_ax[0].legend(loc=0)
 sig_ax[1].legend(loc=0)
 
-diff, diff_ax = plt.subplots(2, sharex=True)
-diff_ax[0].set_title("Diff")
-diff_ax[0].plot(diff1)
-diff_ax[1].plot(diff2)
+#diff, diff_ax = plt.subplots(2, sharex=True)
+#diff_ax[0].set_title("Diff")
+#diff_ax[0].plot(diff1)
+#diff_ax[1].plot(diff2)
 
 plt.show()
