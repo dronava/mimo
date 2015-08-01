@@ -52,18 +52,18 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define WIRE                    "sc16"
 
 // RF front end configurations
-#define CENTER_FREQUENCY        5100e6
+#define CENTER_FREQUENCY        2450e6
 #define SAMPLING_RATE           1.0e6
-#define TX_FRONTEND_GAIN        80.0
+#define TX_FRONTEND_GAIN        67.0
 #define RX_FRONTEND_GAIN        45.0
-#define BASEBAND_GAIN           0.25
+#define BASEBAND_GAIN           0.20
 
 #define CLOCK_SOURCE            CLOCK_SOURCE_EXTERNAL
 #define TIME_SOURCE             TIME_SOURCE_NONE
 
 // OFDM configurations
-#define NUM_SUBCARRIERS         1024
-#define CP_LENGTH               64
+#define NUM_SUBCARRIERS         2048
+#define CP_LENGTH               128
 
 // generator polynomials obtained from
 // primitive_polys.pdf
@@ -82,7 +82,6 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define TX_BEAMFORMING          0
 
 #define DEBUG_LOG               true
-#define ADD_NULL_CARRIERS       false
 #define F_SC_DEBUG_OUT_PREFIX   "/tmp/f_sc_"
 #define CORR_FILE_PREFIX        "/tmp/corr_"
 #define PLATEAU_THREASHOLD      0.95
@@ -94,6 +93,7 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define DEBUG_PRINT             true
 #define DEBUG_PRINT_VERBOSE     false
 #define USE_ALL_CARRIERS        true
+#define ADD_NULL_CARRIERS       true
 #define BPSK_CONSTELLATION_SIZE 2
 #define QPSK_CONSTELLATION_SIZE 4
 #define CONSTELLATION           BPSK_CONSTELLATION
@@ -101,11 +101,11 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define MAKE_S1_QPSK            false
 #define INVERT_CHANNEL          true
 #define INVERT_TO_UNITY         false
-#define NUM_ACCESS_CODES        5
+#define NUM_ACCESS_CODES        20
 #define NUM_MIMO_ACCESS_CODES   3
 #define NUM_STREAMS             2
-#define MODEM_SCHEME            LIQUID_MODEM_QAM16
-#define ARITY                   16
+#define MODEM_SCHEME            LIQUID_MODEM_ARB64OPT
+#define ARITY                   64
 #define SAME_SIGNAL_ON_ALL_TX   false
 #define NORMALIZE_DFT_TXRX      true
 #define NORMALIZE_DFT_RX        true
