@@ -401,6 +401,12 @@ namespace rx_beamforming {
       }
 #endif
     }
+    normalize_gain = (float *) volk_malloc 
+                     (sizeof(float)*M_occupied,
+                      volk_alignment);
+    std::fill(normalize_gain,
+              normalize_gain + M_occupied,
+              1.0f);
     // initialize S0 sequence
     ofdmframe_init_S0(p,
                       M,
@@ -518,7 +524,7 @@ namespace rx_beamforming {
     unsigned int j = 0;
     for(unsigned int sc = 0; sc < M; sc++) {
       if(p[sc] != OFDMFRAME_SCTYPE_NULL) {
-        x[siso_rx][j] = X[siso_rx][sc]*conj(G[sc][siso_rx][siso_tx]);
+        x[siso_rx][j] = X[siso_rx][sc]/(G[sc][siso_rx][siso_tx]);
         j++;
       }
     }
@@ -570,7 +576,15 @@ namespace rx_beamforming {
         j++;     
       }
     }
-    callback(x, M_occupied);
+    volk_32fc_32f_multiply_32fc(X[0],
+                                x[0],
+                                normalize_gain,
+                                M_occupied);
+    volk_32fc_32f_multiply_32fc(X[1],
+                                x[1],
+                                normalize_gain,
+                                M_occupied);
+    callback(X, M_occupied);
     sample_counter = 0;
   }
   
@@ -759,9 +773,10 @@ namespace rx_beamforming {
     }
     
 #if INVERT_CHANNEL
+    unsigned int j = 0;
     for(unsigned int i = 0; i < M; i++) {
-      if(p[i] != OFDMFRAME_SCTYPE_NULL) 
-        invert(W[i], G[i]);
+      if(p[i] != OFDMFRAME_SCTYPE_NULL)
+        normalize_gain[j++] = invert(W[i], G[i]);
     }
 #endif
 
@@ -779,6 +794,9 @@ namespace rx_beamforming {
         }
       }
     }
+    printf("**** normalize_gain\n");
+    for(unsigned int j = 0; j < M_occupied; j++)
+      printf("%3.6f\n", normalize_gain[j]);
 #endif
 
     // process the mimo samples in the
@@ -863,6 +881,7 @@ namespace rx_beamforming {
       fclose(f_sc_debug_out[i]);
 #endif
     }
+    free(normalize_gain);
     free(p);
     free(S0);
     free(s0);
@@ -1271,8 +1290,8 @@ void ofdmframe_init_S1(const unsigned char * _p,
 #endif
 #endif
 
-void invert(std::vector<std::vector<gr_complex> >  &W,
-            std::vector<std::vector<gr_complex> > const &G) {
+float invert(std::vector<std::vector<gr_complex> >  &W,
+             std::vector<std::vector<gr_complex> > const &G) {
   assert(G.size() == 2);
   assert(W.size() == 2);
   for(unsigned int rx_stream = 0; rx_stream < 2; rx_stream++) {
@@ -1289,4 +1308,9 @@ void invert(std::vector<std::vector<gr_complex> >  &W,
   W[1][1] = det_inv*G[0][0];
   W[1][0] = -det_inv*G[1][0];
   W[0][1] = -det_inv*G[0][1];
+#if INVERT_TO_UNITY
+  return 1.0;
+#else
+  return  1.0f/(real(det)*real(det) + imag(det)*imag(det));
+#endif
 }

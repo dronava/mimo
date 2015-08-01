@@ -146,6 +146,8 @@ namespace rx_beamforming {
     // PLCP long
     std::vector<gr_complex *> S1;
     std::vector<gr_complex *> s1;
+    // normalizer
+    float * normalize_gain;
 
     // callback
     mimo_callback callback;
@@ -274,7 +276,7 @@ float fabsf(float x);
 gr_complex conjf(gr_complex z);
 
 // currently only for 2 X 2 matrix
-void invert(std::vector<std::vector<gr_complex> > &W,
-            std::vector<std::vector<gr_complex> > const &G);
+float invert(std::vector<std::vector<gr_complex> > &W,
+             std::vector<std::vector<gr_complex> > const &G);
 
 #endif // FRAMING_H
