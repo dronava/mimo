@@ -669,6 +669,9 @@ namespace rx_beamforming {
         corr_indices[chan][ac_id] = 0;
         corr_values[chan][ac_id] = (float *) malloc 
                                    (sizeof(float)*(access_code_buffer_len - M));
+	std::fill(corr_values[chan][ac_id],
+		  corr_values[chan][ac_id] + access_code_buffer_len - M,
+		  0.0);
 #if DEBUG_LOG
         corr_files[chan][ac_id] = fopen(boost::str(boost::format("%s%d_%d.dat")
                                                    % CORR_FILE_PREFIX
@@ -681,6 +684,9 @@ namespace rx_beamforming {
       s0_corr[chan] = (float *) malloc (sizeof(float)*(access_code_buffer_len - M));
       max_s0_corr[chan] = 0.0f;
       s0_corr_index[chan] = 0;
+      std::fill(s0_corr[chan],
+		s0_corr[chan] + access_code_buffer_len - M,
+		0.0);
 #if DEBUG_LOG
       corr_file_s0[chan] = fopen(boost::str(boost::format("%s%d_0.dat")
                                             % CORR_FILE_PREFIX
@@ -693,6 +699,50 @@ namespace rx_beamforming {
     for(unsigned int chan = 0; chan < num_streams; chan++)
       windowcf_read(access_code_buffer[chan], &buffer_ptr[chan]);
 
+#if USE_NEW_CHANNEL_EST
+    unsigned int sample;
+    for(unsigned int i = 0; i < symbol_len; i++) {
+      for(unsigned int rx_stream = 0;
+	  rx_stream < num_streams; rx_stream++) {
+	sample = i;
+	memmove(x[rx_stream], buffer_ptr[rx_stream] + sample,
+		sizeof(gr_complex)*M);
+	fftwf_execute(fft[rx_stream]);
+        // correlate with S0
+        volk_32fc_x2_conjugate_dot_prod_32fc(&xyz,
+                                             X[rx_stream],
+                                             S0,
+                                             M);
+        s0_corr[rx_stream][sample] = (real(xyz)*real(xyz) + 
+				      imag(xyz)*imag(xyz))/float(M*M);
+        if(s0_corr[rx_stream][sample] > max_s0_corr[rx_stream]) {
+          max_s0_corr[rx_stream] = s0_corr[rx_stream][sample];
+          s0_corr_index[rx_stream] = sample;
+        }
+	for(unsigned int code = 0; code < num_access_codes; code++) {
+	  for(unsigned int tx_chan = 0; tx_chan < num_streams; tx_chan++) {
+	    _ac_id = code*num_streams + tx_chan;
+	    sample = i + symbol_len*(_ac_id + 1);
+	    memmove(x[rx_stream], buffer_ptr[rx_stream] + sample,
+		    sizeof(gr_complex)*M);
+	    fftwf_execute(fft[rx_stream]);
+	    volk_32fc_x2_conjugate_dot_prod_32fc(&xyz,
+						 X[rx_stream],
+						 (S1[tx_chan] + code*M),
+						 M);
+	    corr_values[rx_stream][_ac_id][sample] =
+	      (real(xyz)*real(xyz) + imag(xyz)*imag(xyz))/float(M*M);
+	    if(corr_values[rx_stream][_ac_id][sample] > 
+	       max_corr[rx_stream][_ac_id]) {
+	      corr_indices[rx_stream][_ac_id] = sample;
+	      max_corr[rx_stream][_ac_id] = 
+		corr_values[rx_stream][_ac_id][sample];
+	    }
+	  }
+	}
+      }
+    }
+#else
     // compute the access code indices
     for(unsigned int sample = 0; sample < access_code_buffer_len - M; sample++) {
       for(unsigned int chan = 0; chan < num_streams; chan++) {
@@ -731,6 +781,7 @@ namespace rx_beamforming {
         }
       }
     }
+#endif
 #if DEBUG_PRINT
     for(unsigned int chan = 0; chan < num_streams; chan++) {
       printf("******** s0_corr_index[%d]    : %6u\n", chan, s0_corr_index[chan]);

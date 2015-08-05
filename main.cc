@@ -1397,6 +1397,7 @@ int UHD_SAFE_MAIN(int argc, char **argv)
   printf("    frames sync index 2     : %6lu\n", fs.get_sync_index());
   printf("    num samples processed   : %6llu\n", fs.get_num_samples_processed());
   printf("    frames transmitted      : %6u\n", pid);
+  printf("    num_occupied_carriers   : %6u\n", num_occupied_carriers);
 #if SISO
   printf("    symbols transmitted     : %6lu\n", tx_sig_len);
 #else

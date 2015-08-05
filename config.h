@@ -63,7 +63,7 @@ extern gr_complex QPSK_CONSTELLATION[];
 
 // OFDM configurations
 #define NUM_SUBCARRIERS         2048
-#define CP_LENGTH               128
+#define CP_LENGTH               152
 
 // generator polynomials obtained from
 // primitive_polys.pdf
@@ -104,12 +104,13 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define NUM_ACCESS_CODES        20
 #define NUM_MIMO_ACCESS_CODES   3
 #define NUM_STREAMS             2
-#define MODEM_SCHEME            LIQUID_MODEM_ARB64OPT
-#define ARITY                   64
+#define MODEM_SCHEME            LIQUID_MODEM_ARB32OPT
+#define ARITY                   32
 #define SAME_SIGNAL_ON_ALL_TX   false
 #define NORMALIZE_DFT_TXRX      true
 #define NORMALIZE_DFT_RX        true
 #define USE_NEW_INIT_S0         true
 #define USE_NEW_INIT_S1         true
+#define USE_NEW_CHANNEL_EST     true
 
 #endif

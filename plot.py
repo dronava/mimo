@@ -7,8 +7,9 @@ from math import pi
 from optparse import OptionParser
 import sys
 
-num_access_codes = 5
+num_access_codes = 20
 num_streams = 2
+num_occupied_carriers = 818
 
 parser = OptionParser()
 parser.add_option("-i", "--sync-index", type="int",
@@ -40,11 +41,29 @@ rx_data2  = sp.fromfile(open("/tmp/rx_data2.dat"), dtype=sp.int32)
 diff1 = sp.zeros((len(rx_data1), ), sp.int32)
 diff2 = sp.zeros((len(rx_data2), ), sp.int32)
 
+error1 = sp.zeros(num_occupied_carriers, dtype=sp.int32)
+error2 = sp.zeros(num_occupied_carriers, dtype=sp.int32)
+ECDF1  = sp.zeros(len(rx_data1), dtype=sp.float32)
+ECDF2  = sp.zeros(len(rx_data2), dtype=sp.float32)
+
+ECDFC1 = 0.0
+ECDFC2 = 0.0
+ECDF_INC = 1.0
 for i in range(len(rx_data1)):
   if(rx_data1[i] != tx_data1[i]):
     diff1[i] = 1
+    error1[i%num_occupied_carriers] += 1
+    ECDFC1 += ECDF_INC
   if(rx_data2[i] != tx_data2[i]):
     diff2[i] = 1
+    error2[i%num_occupied_carriers] += 1
+    ECDFC2 += ECDF_INC
+
+  ECDF1[i] = ECDFC1
+  ECDF2[i] = ECDFC2
+
+ECDF1 = ECDF1/ECDFC1
+ECDF2 = ECDF2/ECDFC2
 
 if(options.print_diff):
   for i in range(len(rx_data1)):
@@ -143,5 +162,15 @@ dat_ax[1].plot(tx_data2[0:64], label="TX")
 dat_ax[1].plot(rx_data2[0:64], label="RX")
 dat_ax[0].legend(loc=0)
 dat_ax[1].legend(loc=0)
+
+ecdf, ecdf_ax = plt.subplots(2, sharex=True)
+ecdf_ax[0].set_title("Error CDF")
+ecdf_ax[0].plot(ECDF1)
+ecdf_ax[1].plot(ECDF2)
+
+er_hist, er_hist_ax = plt.subplots(2, sharex=True)
+er_hist_ax[0].set_title("Error Histogram")
+er_hist_ax[0].plot(error1)
+er_hist_ax[1].plot(error2)
 
 plt.show()
