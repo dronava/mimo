@@ -83,9 +83,9 @@ pthread_cond_t condition_ac;
 pthread_cond_t condition_mimo;
 
 // CSI matrix
-gr_complex *** G;
+std::vector<std::vector<std::vector<gr_complex> > > G;
 // precoding matrix
-gr_complex *** W;
+std::vector<std::vector<std::vector<gr_complex> > > W;
 
 // Compute precoding vector given CSI
 void * design_mimo_precoder ()
@@ -348,16 +348,15 @@ void init_usrp(uhd::usrp::multi_usrp::sptr u,
 typedef struct
 {
   uhd::usrp::multi_usrp::sptr * tx;
-  framegen * fg;
+  tx_beamforming::framegen * fg;
 } tx_thread_data;
 
 // structure to load data to rx_thread
 typedef struct
 {
   uhd::usrp::multi_usrp::sptr * rx;
-  framesync * fs;
+  tx_beamforming::framesync * fs;
 } rx_thread_data;
-
 // rx_worker thread
 void * rx_worker (void * _data)
 {
@@ -370,22 +369,21 @@ void * rx_worker (void * _data)
   std::vector<size_t> channels;
   // number of samples read in each call of recv
   unsigned int num_samples_read;
+  // total number of samples read
+  unsigned long int num_accumulated_samples;
   // usrp buffer
-  std::vector<std::complex<float> *> rx_buffer;
+  std::vector<gr_complex *> rx_buffer;
   // log files
   std::vector<FILE *> fp;
-  // state returned from framesync
   framesync_states_t sync_state = STATE_SEEK_PLATEAU;
 
   num_channels = (*(data->rx))->get_rx_num_channels();
   assert(num_channels == NUM_STREAMS);
   for(size_t chan = 0; chan < num_channels; chan++) {
     channels.push_back(chan);
-    if(LOG) {
-      fp.push_back(fopen(boost::str(
-        boost::format("%srx%d.dat") % LOG_DIR % (chan + 1)).c_str(),
-        "wb"));
-    }
+    fp.push_back(fopen(boost::str(
+      boost::format("%srx%d.dat") % LOG_DIR % (chan + 1)).c_str(),
+      "wb"));
   }
 
   // initialize rx streamer
@@ -398,8 +396,8 @@ void * rx_worker (void * _data)
   rx_buffer_len = rx_stream->get_max_num_samps();
   for(size_t chan = 0; chan < num_channels; chan++) {
     // FIXME is volk malloc required here??
-    rx_buffer.push_back((std::complex<float> *) malloc 
-      (sizeof(std::complex<float>)*rx_buffer_len));
+    rx_buffer.push_back((gr_complex *) malloc 
+      (sizeof(gr_complex)*rx_buffer_len));
   }
 
   // start receiving in 0.1 seconds
@@ -410,7 +408,7 @@ void * rx_worker (void * _data)
                        + uhd::time_spec_t(0.1);
   rx_stream->issue_stream_cmd(stream_cmd);
   // lock mutex and signal tx to start
-  std::cout << "Rx locking the mutex and signalling tx\n";
+  std::cout << "Rx signalling tx to send access codes\n";
   pthread_mutex_lock(&mutex_txrx);
   start_ac = true;
   pthread_cond_signal(&condition_ac);
@@ -422,46 +420,47 @@ void * rx_worker (void * _data)
   float timeout = 0.2;
   // FIXME on what condition does rx stop streaming?
   // TODO receive sigal from tx to stop
-  bool break_loop = false;
-  while(1)
+  bool continue_loop = true;
+  num_accumulated_samples = 0;
+  while(continue_loop)
   {
     num_samples_read = rx_stream->recv(rx_buffer,
                                        rx_buffer_len,
                                        rxmd,
                                        timeout);
-    if(rxmd.error_code)
-      break; // TODO error code handling to be done in main
-
-    // logging
-    if(LOG) {
-      for(size_t chan = 0; chan < num_channels; chan++) {
-        assert(fwrite(rx_buffer[chan],
-                      sizeof(std::complex<float>),
-                      num_samples_read,
-                      fp[chan]) == num_samples_read);
-      }
+    if(rxmd.error_code) {
+      printf("    rx thread exit with     : %s\n", rxmd.strerror().c_str());
+      exit(1); // TODO error code handling to be done in main
     }
-
-    // process the received samples through framesync
+    // logging
+    for(size_t chan = 0; chan < num_channels; chan++) {
+      assert(fwrite(rx_buffer[chan],
+                    sizeof(gr_complex),
+                    num_samples_read,
+                    fp[chan]) == num_samples_read);
+    }
+    num_accumulated_samples += num_samples_read;
     sync_state = (data->fs)->execute(rx_buffer, num_samples_read);
+
     if(sync_state == STATE_WAIT) {
       // stop rx streaming
+      printf("rx stopping streaming to compute the channel\n");
+      stream_cmd.stream_now = true;
       stream_cmd.stream_mode = 
         uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
       rx_stream->issue_stream_cmd(stream_cmd);
-      // compute channel
+
       (data->fs)->estimate_channel();
-      (data->fs)->get_G(G);
-      design_mimo_precoder();
-      // start streaming
-      stream_cmd.stream_mode = 
-        uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
+      (data->fs)->clear_buffers();
+      W = (data->fs)->get_W();
+
+      stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS;
       stream_cmd.stream_now = false;
       stream_cmd.time_spec = (*(data->rx))->get_time_now() 
-                           + uhd::time_spec_t(0.01);
+        + uhd::time_spec_t(0.1);
       rx_stream->issue_stream_cmd(stream_cmd);
-      // lock mutex and signal tx to start zf
-      std::cout << "Rx signalling tx to start zf\n";
+      // lock mutex and signal tx to start
+      std::cout << "Rx signalling tx to start MIMO\n";
       pthread_mutex_lock(&mutex_txrx);
       start_mimo = true;
       pthread_cond_signal(&condition_mimo);
@@ -472,28 +471,26 @@ void * rx_worker (void * _data)
     pthread_mutex_lock(&mutex_txrx);
     if(stop_rx) {
       std::cout << "stop_rx is set\n";
-      break_loop = true;
+      continue_loop = false;
     }
     pthread_mutex_unlock(&mutex_txrx);
-    if(break_loop)
-      break;
   }
 
   rx_end = time(NULL);
   // stop rx streaming
+  stream_cmd.stream_now = true;
   stream_cmd.stream_mode = 
     uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
   rx_stream->issue_stream_cmd(stream_cmd);
 
+  // close files
+  for(size_t chan = 0; chan < num_channels; chan++)
+    fclose(fp[chan]);
   // free memory
   for(size_t chan = 0; chan < num_channels; chan++) {
     free(rx_buffer[chan]);
   }
-  // close files
-  if(LOG) {
-    for(size_t chan = 0; chan < num_channels; chan++)
-      fclose(fp[chan]);
-  }
+
   std::cout << "Exiting rx thread\n";
   pthread_exit(NULL);
 }
@@ -515,26 +512,32 @@ void * tx_worker (void * _data)
   // number of samples read from framegen
   unsigned int num_samples_read;
   // usrp buffer
-  std::vector<std::complex<float> *> tx_buffer;
+  std::vector<gr_complex *> tx_buffer;
   // framegen buffer
-  std::vector<std::complex<float> *> fg_buffer;
+  std::vector<gr_complex *> fg_buffer;
   // tx multiplier gain
-  std::vector<std::complex<float> > bb_gain;
+  std::vector<gr_complex > bb_gain;
   // log files
   std::vector<FILE *> fp;
+  // framegen input buffer
+  std::vector<gr_complex *> fg_in_buffer;
+  // num of frequency symbols transmitted
+  unsigned int num_symbols_transmitted = 0;
 
   num_channels = (*(data->tx))->get_tx_num_channels();
   assert(num_channels == NUM_STREAMS);
   size_t volk_alignment = volk_get_alignment();
-  std::complex<float> Z(0.0, 0.0);
+  gr_complex Z(0.0, 0.0);
   for(size_t chan = 0; chan < num_channels; chan++) {
     channels.push_back(chan);
-    tx_buffer.push_back((std::complex<float> *) volk_malloc 
-      (sizeof(std::complex<float>)*tx_buffer_len,
+    tx_buffer.push_back((gr_complex *) volk_malloc 
+      (sizeof(gr_complex)*tx_buffer_len,
        volk_alignment));
-    fg_buffer.push_back((std::complex<float> *) volk_malloc 
-      (sizeof(std::complex<float>)*tx_buffer_len,
+    fg_buffer.push_back((gr_complex *) volk_malloc 
+      (sizeof(gr_complex)*tx_buffer_len,
        volk_alignment));
+    fg_in_buffer.push_back((gr_complex *) malloc 
+      (sizeof(gr_complex)*num_occupied_carriers));
     std::fill(tx_buffer[chan], tx_buffer[chan] + tx_buffer_len,
               Z);
     if(LOG) {
@@ -554,7 +557,6 @@ void * tx_worker (void * _data)
   tx_stream_args.channels = channels;
   uhd::tx_streamer::sptr tx_stream = 
     (*(data->tx))->get_tx_stream(tx_stream_args);
-
   /*
    * Lock mutex and wait for signal.  
    * Note that the pthread_cond_wait routine will 
@@ -566,9 +568,9 @@ void * tx_worker (void * _data)
   pthread_mutex_lock(&mutex_txrx);
   while (!(start_ac)) {
     // blocks tx thread
-    std::cout << "Waiting for signal from rx\n";
+    std::cout << "Waiting for signal from rx to send access codes\n";
     pthread_cond_wait(&condition_ac, &mutex_txrx);
-    std::cout << "Sigal received from rx thread\n";
+    std::cout << "Tx sending access codes\n";
   }
   pthread_mutex_unlock(&mutex_txrx);
 
@@ -592,7 +594,7 @@ void * tx_worker (void * _data)
   if(LOG) {
     for(size_t chan = 0; chan < num_channels; chan++) {
       assert(fwrite(tx_buffer[chan],
-                    sizeof(std::complex<float>),
+                    sizeof(gr_complex),
                     num_samples_sent,
                     fp[chan]) == num_samples_sent);
     }
@@ -609,14 +611,11 @@ void * tx_worker (void * _data)
                                   fg_buffer[chan],
                                   bb_gain[chan],
                                   num_samples_read);
-    // fill fg_buffer with zeros
-    std::fill(fg_buffer[chan], fg_buffer[chan] + tx_buffer_len,
-              Z);
   }
   // set tx metadata
   txmd.start_of_burst = false;
+  txmd.end_of_burst = true;
   txmd.has_time_spec = false;
-
   // send sync words
   num_samples_sent = tx_stream->send(tx_buffer,
                                      num_samples_read,
@@ -627,47 +626,34 @@ void * tx_worker (void * _data)
   if(LOG) {
     for(size_t chan = 0; chan < num_channels; chan++) {
       assert(fwrite(tx_buffer[chan],
-                    sizeof(std::complex<float>),
+                    sizeof(gr_complex),
                     num_samples_sent,
                     fp[chan]) == num_samples_sent);
     }
   }
-  // stop streaming
-  txmd.end_of_burst = true;
-  num_samples_sent = tx_stream->send(fg_buffer,
-                                     tx_buffer_len,
-                                     txmd,
-                                     1.0);
-  assert(num_samples_sent == tx_buffer_len);
-  // logging
-  if(LOG) {
-    for(size_t chan = 0; chan < num_channels; chan++) {
-      assert(fwrite(fg_buffer[chan],
-                    sizeof(std::complex<float>),
-                    num_samples_sent,
-                    fp[chan]) == num_samples_sent);
-    }
-  }
-  
+
+  // wait for start MIMO signal from rx
   pthread_mutex_lock(&mutex_txrx);
   while (!(start_mimo)) {
     // blocks tx thread
-    std::cout << "Waiting for signal from rx to begin zf\n";
+    std::cout << "Waiting for signal from rx to begin mimo\n";
     pthread_cond_wait(&condition_mimo, &mutex_txrx);
-    std::cout << "Begin zf sigal received from rx thread\n";
+    std::cout << "Begin mimo sigal received from rx thread\n";
   }
   pthread_mutex_unlock(&mutex_txrx);
-
-  // update the mimo beamformer
   (data->fg)->set_W(W);
-  //************* MIMO ******************//
-  std::cout << "***** begin mimo transmission ******\n";
+  for(unsigned int chan = 0; chan < num_channels; chan++) {
+    std::fill(tx_buffer[chan], tx_buffer[chan] + tx_buffer_len,
+              Z);
+  }
+  std::cout << "********** begin MIMO ***********\n";
   txmd.start_of_burst = true;
   txmd.end_of_burst = false;
   txmd.has_time_spec = true;
   txmd.time_spec = (*(data->tx))->get_time_now()
                  + uhd::time_spec_t(0.1);
-  num_samples_sent = tx_stream->send(fg_buffer,
+
+  num_samples_sent = tx_stream->send(tx_buffer,
                                      tx_buffer_len,
                                      txmd,
                                      1.0);
@@ -675,17 +661,53 @@ void * tx_worker (void * _data)
   // logging
   if(LOG) {
     for(size_t chan = 0; chan < num_channels; chan++) {
-      assert(fwrite(fg_buffer[chan],
-                    sizeof(std::complex<float>),
+      assert(fwrite(tx_buffer[chan],
+                    sizeof(gr_complex),
                     num_samples_sent,
                     fp[chan]) == num_samples_sent);
     }
   }
   txmd.start_of_burst = false;
   txmd.has_time_spec = false;
+  num_samples_read = (data->fg)->write_short_sync_words(fg_buffer);
+  assert(num_samples_read <= tx_buffer_len);
+  // apply baseband gain
+  // FIXME see if this multiply const can be done in place.
+  // see if it is benificial to do this in separate
+  // thread for each channel.
+  for(size_t chan = 0; chan < num_channels; chan++) {
+    volk_32fc_s32fc_multiply_32fc(tx_buffer[chan],
+                                  fg_buffer[chan],
+                                  bb_gain[chan],
+                                  num_samples_read);
+  }
+  num_samples_sent = tx_stream->send(tx_buffer,
+                                     num_samples_read,
+                                     txmd,
+                                     1.0);
+  assert(num_samples_sent == num_samples_read);
+  // logging
+  if(LOG) {
+    for(size_t chan = 0; chan < num_channels; chan++) {
+      assert(fwrite(tx_buffer[chan],
+                    sizeof(gr_complex),
+                    num_samples_sent,
+                    fp[chan]) == num_samples_sent);
+    }
+  }
 
-  for(pid = 0; pid < PID_MAX; pid++) {
-    num_samples_read = (data->fg)->write_mimo_packet(fg_buffer);
+  for(pid = 0;
+      ((pid < PID_MAX) && 
+       (num_symbols_transmitted + num_occupied_carriers <= tx_sig_len));
+      pid++) {
+    for(unsigned int chan = 0; chan < num_channels; chan++) {
+      memmove(fg_in_buffer[chan],
+              tx_sig[chan] + num_symbols_transmitted,
+              sizeof(gr_complex)*num_occupied_carriers);
+    }
+    num_symbols_transmitted += num_occupied_carriers;
+    num_samples_read = 
+      (data->fg)->assemble_mimo_packet(fg_buffer, fg_in_buffer);
     assert(num_samples_read <= tx_buffer_len);
     // apply baseband gain
     // FIXME see if this multiply const can be done in place.
@@ -706,7 +728,7 @@ void * tx_worker (void * _data)
     if(LOG) {
       for(size_t chan = 0; chan < num_channels; chan++) {
         assert(fwrite(tx_buffer[chan],
-                      sizeof(std::complex<float>),
+                      sizeof(gr_complex),
                       num_samples_sent,
                       fp[chan]) == num_samples_sent);
       }
@@ -717,15 +739,15 @@ void * tx_worker (void * _data)
     std::fill(tx_buffer[chan], tx_buffer[chan] + tx_buffer_len, Z);
   txmd.end_of_burst = true;
   num_samples_sent = tx_stream->send(tx_buffer,
-                                     tx_buffer_len,
+                                     NUM_SUBCARRIERS + CP_LENGTH,
                                      txmd,
                                      1.0);
-  assert(num_samples_sent == tx_buffer_len);
+  assert(num_samples_sent == NUM_SUBCARRIERS + CP_LENGTH);
   // logging
   if(LOG) {
     for(size_t chan = 0; chan < num_channels; chan++) {
       assert(fwrite(tx_buffer[chan],
-                    sizeof(std::complex<float>),
+                    sizeof(gr_complex),
                     num_samples_sent,
                     fp[chan]) == num_samples_sent);
     }
@@ -742,6 +764,7 @@ void * tx_worker (void * _data)
   for(size_t chan = 0; chan < num_channels; chan++) {
     volk_free(tx_buffer[chan]);
     volk_free(fg_buffer[chan]);
+    free(fg_in_buffer[chan]);
   }
   // close files
   if(LOG) {
@@ -784,7 +807,7 @@ void * rx_worker (void * _data)
   // total number of samples read
   unsigned long int num_accumulated_samples;
   // usrp buffer
-  std::vector<std::complex<float> *> rx_buffer;
+  std::vector<gr_complex *> rx_buffer;
   // log files
   std::vector<FILE *> fp;
 
@@ -807,8 +830,8 @@ void * rx_worker (void * _data)
   rx_buffer_len = rx_stream->get_max_num_samps();
   for(size_t chan = 0; chan < num_channels; chan++) {
     // FIXME is volk malloc required here??
-    rx_buffer.push_back((std::complex<float> *) malloc 
-      (sizeof(std::complex<float>)*rx_buffer_len));
+    rx_buffer.push_back((gr_complex *) malloc 
+      (sizeof(gr_complex)*rx_buffer_len));
   }
 
   // start receiving in 0.1 seconds
@@ -845,7 +868,7 @@ void * rx_worker (void * _data)
     // logging
     for(size_t chan = 0; chan < num_channels; chan++) {
       assert(fwrite(rx_buffer[chan],
-                    sizeof(std::complex<float>),
+                    sizeof(gr_complex),
                     num_samples_read,
                     fp[chan]) == num_samples_read);
     }
@@ -914,11 +937,11 @@ void * tx_worker (void * _data)
   // number of samples read from framegen
   unsigned int num_samples_read;
   // usrp buffer
-  std::vector<std::complex<float> *> tx_buffer;
+  std::vector<gr_complex *> tx_buffer;
   // framegen buffer
-  std::vector<std::complex<float> *> fg_buffer;
+  std::vector<gr_complex *> fg_buffer;
   // tx multiplier gain
-  std::vector<std::complex<float> > bb_gain;
+  std::vector<gr_complex > bb_gain;
   // log files
   std::vector<FILE *> fp;
   // framegen input buffer
@@ -929,17 +952,17 @@ void * tx_worker (void * _data)
   num_channels = (*(data->tx))->get_tx_num_channels();
   assert(num_channels == NUM_STREAMS);
   size_t volk_alignment = volk_get_alignment();
-  std::complex<float> Z(0.0, 0.0);
+  gr_complex Z(0.0, 0.0);
   for(size_t chan = 0; chan < num_channels; chan++) {
     channels.push_back(chan);
-    tx_buffer.push_back((std::complex<float> *) volk_malloc 
-      (sizeof(std::complex<float>)*tx_buffer_len,
+    tx_buffer.push_back((gr_complex *) volk_malloc 
+      (sizeof(gr_complex)*tx_buffer_len,
        volk_alignment));
-    fg_buffer.push_back((std::complex<float> *) volk_malloc 
-      (sizeof(std::complex<float>)*tx_buffer_len,
+    fg_buffer.push_back((gr_complex *) volk_malloc 
+      (sizeof(gr_complex)*tx_buffer_len,
        volk_alignment));
-    fg_in_buffer.push_back((std::complex<float> *) malloc 
-      (sizeof(std::complex<float>)*num_occupied_carriers));
+    fg_in_buffer.push_back((gr_complex *) malloc 
+      (sizeof(gr_complex)*num_occupied_carriers));
     std::fill(tx_buffer[chan], tx_buffer[chan] + tx_buffer_len,
               Z);
     if(LOG) {
@@ -997,7 +1020,7 @@ void * tx_worker (void * _data)
   if(LOG) {
     for(size_t chan = 0; chan < num_channels; chan++) {
       assert(fwrite(tx_buffer[chan],
-                    sizeof(std::complex<float>),
+                    sizeof(gr_complex),
                     num_samples_sent,
                     fp[chan]) == num_samples_sent);
     }
@@ -1029,7 +1052,7 @@ void * tx_worker (void * _data)
   if(LOG) {
     for(size_t chan = 0; chan < num_channels; chan++) {
       assert(fwrite(tx_buffer[chan],
-                    sizeof(std::complex<float>),
+                    sizeof(gr_complex),
                     num_samples_sent,
                     fp[chan]) == num_samples_sent);
     }
@@ -1067,7 +1090,7 @@ void * tx_worker (void * _data)
     if(LOG) {
       for(size_t chan = 0; chan < num_channels; chan++) {
         assert(fwrite(tx_buffer[chan],
-                      sizeof(std::complex<float>),
+                      sizeof(gr_complex),
                       num_samples_sent,
                       fp[chan]) == num_samples_sent);
       }
@@ -1086,7 +1109,7 @@ void * tx_worker (void * _data)
   if(LOG) {
     for(size_t chan = 0; chan < num_channels; chan++) {
       assert(fwrite(tx_buffer[chan],
-                    sizeof(std::complex<float>),
+                    sizeof(gr_complex),
                     num_samples_sent,
                     fp[chan]) == num_samples_sent);
     }
@@ -1129,14 +1152,8 @@ int UHD_SAFE_MAIN(int argc, char **argv)
   unsigned int cp_len = CP_LENGTH;
   unsigned int num_streams = NUM_STREAMS;
 
-
   // allocate space for CSI and W
   gr_complex I(1.0, 0.0);
-
-  gr_complex _G_[NUM_SUBCARRIERS][NUM_STREAMS][NUM_STREAMS];
-  gr_complex _W_[NUM_SUBCARRIERS][NUM_STREAMS][NUM_STREAMS];
-  G = (gr_complex ***)_G_;
-  W = (gr_complex ***)_W_;
 
   unsigned char * p;
   msequence ms_S0;
@@ -1158,6 +1175,28 @@ int UHD_SAFE_MAIN(int argc, char **argv)
                             &num_data_carriers);
   num_occupied_carriers = num_pilot_carriers + num_data_carriers;
   tx_sig_len = num_occupied_carriers*PID_MAX;
+
+  G.resize(M);
+  W.resize(M);
+  for(unsigned int sc = 0; sc < M; sc++) {
+    G[sc].resize(num_streams);
+    W[sc].resize(num_streams);
+    for(unsigned int rx_stream = 0; rx_stream < num_streams; rx_stream++) {
+      G[sc][rx_stream].resize(num_streams);
+      W[sc][rx_stream].resize(num_streams);
+      for(unsigned int tx_stream = 0; tx_stream < num_streams; tx_stream++) {
+        if((p[sc] != OFDMFRAME_SCTYPE_NULL) && (tx_stream == rx_stream)) {
+          G[sc][rx_stream][tx_stream] = 1.0;
+          W[sc][rx_stream][tx_stream] = 1.0;
+        }
+        else {
+          G[sc][rx_stream][tx_stream] = 0.0;
+          W[sc][rx_stream][tx_stream] = 0.0;
+        }
+      }
+    }
+  }
+
   for(unsigned int chan = 0; chan < num_streams; chan++) {
     num_valid_bytes.push_back(0);
     mod.push_back(modem_create(MODEM_SCHEME));
@@ -1229,6 +1268,7 @@ int UHD_SAFE_MAIN(int argc, char **argv)
   ms_S1[0] = msequence_create(LFSR_LARGE_LENGTH, LFSR_LARGE_0_GEN_POLY, 1);
   ms_S1[1] = msequence_create(LFSR_LARGE_LENGTH, LFSR_LARGE_1_GEN_POLY, 1);
 #if TX_BEAMFORMING
+  tx_beamforming::
   framegen fg(M,
               cp_len,
               num_streams,
@@ -1236,10 +1276,10 @@ int UHD_SAFE_MAIN(int argc, char **argv)
               p,
               ms_S0,
               ms_S1);
-  fg.set_W(W);
   msequence_reset(ms_S0);
   msequence_reset(ms_S1[0]);
   msequence_reset(ms_S1[1]);
+  tx_beamforming::
   framesync fs(M,
                cp_len,
                num_streams,
@@ -1393,6 +1433,16 @@ int UHD_SAFE_MAIN(int argc, char **argv)
                                                  fs.get_plateau_start(1) + 1);
   printf("    plateau start 2         : %6lu\n", fs.get_plateau_start(1));
   printf("    plateau end   2         : %6lu\n", fs.get_plateau_end(1));
+#if TX_BEAMFORMING
+  printf("    short plateau width 1   : %6lu\n", fs.get_short_ac_plateau_end(0) - 
+                                                 fs.get_short_ac_plateau_start(0) + 1);
+  printf("    short plateau start 1   : %6lu\n", fs.get_short_ac_plateau_start(0));
+  printf("    short plateau end   1   : %6lu\n", fs.get_short_ac_plateau_end(0));
+  printf("    short plateau width 2   : %6lu\n", fs.get_short_ac_plateau_end(1) - 
+                                                 fs.get_short_ac_plateau_start(1) + 1);
+  printf("    short plateau start 2   : %6lu\n", fs.get_short_ac_plateau_start(1));
+  printf("    short plateau end   2   : %6lu\n", fs.get_short_ac_plateau_end(1));
+#endif
   printf("    *************************\n");
   printf("    frames sync index 2     : %6lu\n", fs.get_sync_index());
   printf("    num samples processed   : %6llu\n", fs.get_num_samples_processed());

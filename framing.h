@@ -35,8 +35,204 @@ typedef enum {
   STATE_SEEK_PLATEAU = 0,
   STATE_SAVE_ACCESS_CODES,
   STATE_WAIT,
+  STATE_SEEK_SHORT_ACCESS_CODE,
+  STATE_SAVE_SHORT_ACCESS_CODES,
   STATE_MIMO
 } framesync_states_t;
+
+namespace tx_beamforming {
+  class framegen {
+   private:
+    // number of subcarriers
+    unsigned int M;
+    // cyclic prefix length
+    unsigned int cp_len;
+    // symbol length
+    unsigned int symbol_len;
+    // number of data streams
+    unsigned int num_streams;
+    // number of access codes
+    unsigned int num_access_codes;
+    // subcarrier allocation
+    unsigned char * p;
+    // number of null subcarriers
+    unsigned int M_null;
+    // number of pilot subcarriers
+    unsigned int M_pilot;
+    // number of data subcarriers
+    unsigned int M_data;
+    // frequency domain buffer
+    std::vector<gr_complex *> X;
+    // time domain buffer
+    std::vector<gr_complex *> x;
+    // scaling factors
+    gr_complex g_data;
+    // transform object
+    std::vector<fftwf_plan> ifft;
+    gr_complex dft_normalizer;
+    // PLCP short
+    gr_complex * S0;
+    gr_complex * s0;
+    // PLCP long
+    std::vector<gr_complex *> S1;
+    std::vector<gr_complex *> s1;
+    // CSI
+    std::vector<std::vector<std::vector<gr_complex> > > G;
+    // Receive beamformer
+    std::vector<std::vector<std::vector<gr_complex> > > W;
+  
+    // volk buffer for volk operations
+    gr_complex * volk_buff_fc1;
+    gr_complex * volk_buff_fc2;
+    gr_complex * volk_buff_fc3;
+    float * volk_buff_f1;
+  
+   public:
+    // constructor
+    framegen(unsigned int _M,
+             unsigned int _cp_len,
+             unsigned int _num_streams,
+             unsigned int _num_access_codes,
+             unsigned char * const &_p,
+             msequence const &_ms_S0,
+             std::vector<msequence> const &_ms_S1);
+    // destructor
+    ~framegen();
+    void print();
+  
+    unsigned int
+    write_sync_words(std::vector<gr_complex *> tx_buff);
+    unsigned int
+      assemble_mimo_packet(std::vector<gr_complex *> tx_buff,
+                           std::vector<gr_complex *> in_buff);
+    unsigned int get_num_streams();
+    void set_W(std::vector<std::vector<std::vector<gr_complex> > > _W);
+    unsigned int
+    write_short_sync_words(std::vector<gr_complex *> tx_buff);    
+  };
+  
+  class framesync {
+   private:
+    // number of subcarriers
+    unsigned int M;
+    // M/2
+    unsigned int M2;
+    // cyclic prefix length
+    unsigned int cp_len;
+    // symbol length
+    unsigned int symbol_len;
+    // number of data streams
+    unsigned int num_streams;
+    // number of access codes
+    unsigned int num_access_codes;
+    // subcarrier allocation
+    unsigned char * p;
+    // number of null subcarriers
+    unsigned int M_null;
+    // number of pilot subcarriers
+    unsigned int M_pilot;
+    // number of data subcarriers
+    unsigned int M_data;
+    unsigned int M_occupied;
+    // counter
+    unsigned int sample_counter;
+    // frequency domain buffer
+    std::vector<gr_complex *> X;
+    // time domain buffer
+    std::vector<gr_complex *> x;
+    // ofdm symbol
+    std::vector<gr_complex *> symbol;
+    // CSI
+    std::vector<std::vector<std::vector<gr_complex> > > G;
+    // Receive beamformer
+    std::vector<std::vector<std::vector<gr_complex> > > W;
+    // transform object
+    std::vector<fftwf_plan> fft;
+    gr_complex dft_normalizer;
+    // PLCP short
+    gr_complex * S0;
+    gr_complex * s0;
+    // PLCP long
+    std::vector<gr_complex *> S1;
+    std::vector<gr_complex *> s1;
+    // normalizer
+    gr_complex * normalize_gain;
+
+    // callback
+    mimo_callback callback;
+  
+    // volk buffer for volk operations
+    gr_complex * volk_buff_fc1;
+    gr_complex * volk_buff_fc2;
+    gr_complex * volk_buff_fc3;
+    float * volk_buff_f1;
+
+    unsigned int siso_tx;
+    unsigned int siso_rx;
+  
+    void increment_state();
+  
+    // sync 
+    unsigned long int sync_index;
+    unsigned long long int num_samples_processed;
+    void execute_sc_sync(gr_complex _x[]);
+    void execute_save_access_codes(gr_complex _x[]);
+    void execute_save_short_access_codes(gr_complex _x[]);
+    void process_short_access_codes();
+    framesync_states_t state;
+    void execute_mimo_decode(gr_complex _x[]);
+    void execute_siso_decode(gr_complex _x[]);
+    float execute_sc_sync(gr_complex _x, unsigned int stream);
+    void execute_seek_short_access_code(gr_complex _x[]);
+
+    // Schmidl & Cox
+    std::vector<wdelaycf> delay_M2;
+    std::vector<windowcf> access_code_buffer;
+    std::vector<windowf> plateau_buffer;
+    unsigned int plateau_buffer_len;
+    unsigned int access_code_buffer_len;
+    unsigned int short_access_code_buffer_len;
+    unsigned int tx_sig_len;
+    std::vector<firfilt_crcf> crosscorrelator;
+    std::vector<firfilt_rrrf> normalizer;
+    std::vector<unsigned long int> plateau_start;
+    std::vector<unsigned long int> plateau_end;
+    std::vector<unsigned long int> short_ac_plateau_start;
+    std::vector<unsigned long int> short_ac_plateau_end;
+    unsigned int short_ac_sync_index;
+    std::vector<bool> in_plateau;
+    std::vector<FILE *> f_sc_debug_out;
+   public:
+    // constructor
+    framesync(unsigned int _M,
+              unsigned int _cp_len,
+              unsigned int _num_streams,
+              unsigned int _num_access_codes,
+              unsigned char * const &_p,
+              msequence const &_ms_S0,
+              std::vector<msequence> const &_ms_S1,
+              mimo_callback _callback);
+    // destructor
+    ~framesync();
+    void print();
+    unsigned long int get_sync_index();
+    std::vector<std::vector<std::vector<gr_complex> > > get_G();
+    unsigned long long int get_num_samples_processed();
+    framesync_states_t execute(std::vector<gr_complex *> const &in_buff,
+                             unsigned int num_samples);
+    unsigned long int get_plateau_start(unsigned int stream);
+    unsigned long int get_plateau_end(unsigned int stream);
+    unsigned long int get_short_ac_plateau_start(unsigned int stream);
+    unsigned long int get_short_ac_plateau_end(unsigned int stream);
+    void reset();
+    void estimate_channel();
+    std::vector<std::vector<std::vector<gr_complex> > > get_W();
+
+    void set_siso_tx(unsigned int _tx);
+    void set_siso_rx(unsigned int _rx);
+    void clear_buffers();
+  };
+} // namespace tx_beamforming
 
 namespace rx_beamforming {
   class framegen {
@@ -76,9 +272,9 @@ namespace rx_beamforming {
     std::vector<gr_complex *> s1;
   
     // volk buffer for volk operations
-    std::complex<float> * volk_buff_fc1;
-    std::complex<float> * volk_buff_fc2;
-    std::complex<float> * volk_buff_fc3;
+    gr_complex * volk_buff_fc1;
+    gr_complex * volk_buff_fc2;
+    gr_complex * volk_buff_fc3;
     float * volk_buff_f1;
   
    public:
@@ -95,7 +291,7 @@ namespace rx_beamforming {
     void print();
   
     unsigned int
-    write_sync_words(std::vector<std::complex<float> *> tx_buff);
+    write_sync_words(std::vector<gr_complex *> tx_buff);
     unsigned int
       assemble_mimo_packet(std::vector<gr_complex *> tx_buff,
                            std::vector<gr_complex *> in_buff);
@@ -153,9 +349,9 @@ namespace rx_beamforming {
     mimo_callback callback;
   
     // volk buffer for volk operations
-    std::complex<float> * volk_buff_fc1;
-    std::complex<float> * volk_buff_fc2;
-    std::complex<float> * volk_buff_fc3;
+    gr_complex * volk_buff_fc1;
+    gr_complex * volk_buff_fc2;
+    gr_complex * volk_buff_fc3;
     float * volk_buff_f1;
 
     unsigned int siso_tx;
@@ -176,6 +372,8 @@ namespace rx_beamforming {
     // Schmidl & Cox
     std::vector<wdelaycf> delay_M2;
     std::vector<windowcf> access_code_buffer;
+    std::vector<windowf> plateau_buffer;
+    unsigned int plateau_buffer_len;
     unsigned int access_code_buffer_len;
     unsigned int tx_sig_len;
     std::vector<firfilt_crcf> crosscorrelator;
@@ -213,8 +411,6 @@ namespace rx_beamforming {
   };
 } // namespace rx_beamforming
 
-namespace tx_beamforming {
-}
 
 // initialize default subcarrier allocation
 //  _M      :   number of subcarriers
@@ -252,8 +448,8 @@ void ofdmframe_print_sctype(const unsigned char * _p, unsigned int _M);
 //  ms      :   pn_sequence generator to generate S0
 void ofdmframe_init_S0(const unsigned char * _p,
                        unsigned int _M,
-                       std::complex<float> * _S0,
-                       std::complex<float> * _s0,
+                       gr_complex * _S0,
+                       gr_complex * _s0,
                        msequence ms);
 
 // generate long sequence symbols
@@ -265,8 +461,8 @@ void ofdmframe_init_S0(const unsigned char * _p,
 void ofdmframe_init_S1(const unsigned char * _p,
                        unsigned int _M,
                        unsigned int _num_access_codes,
-                       std::complex<float> * _S1,
-                       std::complex<float> * _s1,
+                       gr_complex * _S1,
+                       gr_complex * _s1,
                        msequence ms);
 
 gr_complex liquid_cexpjf(float theta);
@@ -276,7 +472,11 @@ float fabsf(float x);
 gr_complex conjf(gr_complex z);
 
 // currently only for 2 X 2 matrix
+#if TX_BEAMFORMING
+gr_complex invert(std::vector<std::vector<gr_complex> > &W,
+                  std::vector<std::vector<gr_complex> > const &G);
+#else
 float invert(std::vector<std::vector<gr_complex> > &W,
              std::vector<std::vector<gr_complex> > const &G);
-
+#endif
 #endif // FRAMING_H

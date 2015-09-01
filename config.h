@@ -64,6 +64,7 @@ extern gr_complex QPSK_CONSTELLATION[];
 // OFDM configurations
 #define NUM_SUBCARRIERS         2048
 #define CP_LENGTH               152
+#define GUARD_BAND_INV          20    
 
 // generator polynomials obtained from
 // primitive_polys.pdf
@@ -83,6 +84,7 @@ extern gr_complex QPSK_CONSTELLATION[];
 
 #define DEBUG_LOG               true
 #define F_SC_DEBUG_OUT_PREFIX   "/tmp/f_sc_"
+#define F_SC_SHORT_DEBUG_PREFIX "/tmp/f_sc_short"
 #define CORR_FILE_PREFIX        "/tmp/corr_"
 #define PLATEAU_THREASHOLD      0.95
 
@@ -92,7 +94,7 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define PID_MAX                 1000
 #define DEBUG_PRINT             true
 #define DEBUG_PRINT_VERBOSE     false
-#define USE_ALL_CARRIERS        true
+#define USE_ALL_CARRIERS        false
 #define ADD_NULL_CARRIERS       true
 #define BPSK_CONSTELLATION_SIZE 2
 #define QPSK_CONSTELLATION_SIZE 4
@@ -104,8 +106,8 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define NUM_ACCESS_CODES        20
 #define NUM_MIMO_ACCESS_CODES   3
 #define NUM_STREAMS             2
-#define MODEM_SCHEME            LIQUID_MODEM_ARB32OPT
-#define ARITY                   32
+#define MODEM_SCHEME            LIQUID_MODEM_ARB16OPT
+#define ARITY                   16
 #define SAME_SIGNAL_ON_ALL_TX   false
 #define NORMALIZE_DFT_TXRX      true
 #define NORMALIZE_DFT_RX        true

@@ -9,7 +9,7 @@ import sys
 
 num_access_codes = 20
 num_streams = 2
-num_occupied_carriers = 818
+num_occupied_carriers = 2048
 
 parser = OptionParser()
 parser.add_option("-i", "--sync-index", type="int",
@@ -141,6 +141,8 @@ title = "Sync Output"
 plt.figure(4)
 plt.plot(f_sc1[len(f_sc1) - 64*4:], 'b', label="Ch1")
 plt.plot(f_sc2[len(f_sc2) - 64*4:], 'r', label="Ch2")
+plt.title(title)
+plt.legend(loc=0)
 
 sig, sig_ax = plt.subplots(4, sharex=True)
 sig_ax[0].plot([x.real for x in tx_sig1[0:64]], label="Real")
