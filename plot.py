@@ -10,6 +10,15 @@ import sys
 num_access_codes = 20
 num_streams = 2
 num_occupied_carriers = 2048
+#rx_sig1  = sp.fromfile(open("/tmp/rx_sig1.dat"), dtype=sp.complex64)
+#rx_sig2  = sp.fromfile(open("/tmp/rx_sig2.dat"), dtype=sp.complex64)
+#
+#plt.figure()
+#plt.scatter(rx_sig1.real, rx_sig1.imag)
+#plt.figure()
+#plt.scatter(rx_sig2.real, rx_sig2.imag)
+#plt.show()
+
 
 parser = OptionParser()
 parser.add_option("-i", "--sync-index", type="int",

@@ -91,10 +91,10 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define SISO                    false
 #define SISO_TX                 1
 #define SISO_RX                 1
-#define PID_MAX                 1000
+#define PID_MAX                 100
 #define DEBUG_PRINT             true
 #define DEBUG_PRINT_VERBOSE     false
-#define USE_ALL_CARRIERS        false
+#define USE_ALL_CARRIERS        true
 #define ADD_NULL_CARRIERS       true
 #define BPSK_CONSTELLATION_SIZE 2
 #define QPSK_CONSTELLATION_SIZE 4
@@ -106,8 +106,8 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define NUM_ACCESS_CODES        20
 #define NUM_MIMO_ACCESS_CODES   3
 #define NUM_STREAMS             2
-#define MODEM_SCHEME            LIQUID_MODEM_ARB16OPT
-#define ARITY                   16
+#define MODEM_SCHEME            LIQUID_MODEM_QAM4
+#define ARITY                   4
 #define SAME_SIGNAL_ON_ALL_TX   false
 #define NORMALIZE_DFT_TXRX      true
 #define NORMALIZE_DFT_RX        true
