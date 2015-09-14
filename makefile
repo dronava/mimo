@@ -8,7 +8,7 @@ RM				:= rm -f
 INCLUDE_CFLAGS	= -I./ -I/target/include -I./include
 CFLAGS			= 	$(INCLUDE_CFLAGS) -g -O2 -Wall -fPIC
 LDFLAGS			= 	-L/target/lib
-LDFLAGS			+= 	-luhd -lliquid -lm -lc -lboost_system-mt -lboost_thread-mt -lliquidgr
+LDFLAGS			+= 	-luhd -lliquid -lm -lc -lboost_system-mt -lboost_thread-mt
 LDFLAGS			+= 	-lboost_program_options-mt -lpthread -lvolk -lfftw3f
 env				 	= 	LD_LIBRARY_PATH="/target/lib"
 
