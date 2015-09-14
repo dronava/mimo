@@ -245,6 +245,8 @@ void init_usrp(uhd::usrp::multi_usrp::sptr u,
   // set time source
   switch(configs->time_source) {
     case(TIME_SOURCE_NONE):
+      u->set_time_source("internal");
+      u->set_time_now(uhd::time_spec_t(0.0));
       break;
     case(TIME_SOURCE_EXTERNAL):
       u->set_time_source("external");
