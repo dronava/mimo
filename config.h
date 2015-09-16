@@ -56,7 +56,7 @@ extern gr_complex QPSK_CONSTELLATION[];
 #define SAMPLING_RATE           1.0e6
 #define TX_FRONTEND_GAIN        67.0
 #define RX_FRONTEND_GAIN        45.0
-#define BASEBAND_GAIN           0.20
+#define BASEBAND_GAIN           0.25
 
 #define CLOCK_SOURCE            CLOCK_SOURCE_EXTERNAL
 #define TIME_SOURCE             TIME_SOURCE_NONE
